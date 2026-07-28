@@ -5,7 +5,7 @@ import './index.css'
 
 // Configuration for GenLayer Studio Network (studionet)
 const STUDIO_RPC = 'https://studio.genlayer.com/rpc' 
-const DEFAULT_CONTRACT_ADDRESS = import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS || '0x3316cF283e8E9709c5DE8eA4dE0B4D3f4bfc46Db'
+const DEFAULT_CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS || '0x3316cF283e8E9709c5DE8eA4dE0B4D3f4bfc46Db'
 
 interface EscrowState {
   escrowId: string;
