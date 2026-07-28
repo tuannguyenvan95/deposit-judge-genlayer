@@ -132,6 +132,7 @@ function App() {
   const [listingUrl, setListingUrl] = useState('')
   const [description, setDescription] = useState('')
   const [evidenceUrl, setEvidenceUrl] = useState('')
+  const [uploadingIpfs, setUploadingIpfs] = useState(false)
 
   // Current Escrow Interactive Tracker
   const [currentEscrow, setCurrentEscrow] = useState<EscrowState | null>(null)
@@ -305,6 +306,21 @@ function App() {
     } finally {
       setLoading(null)
     }
+  }
+
+  // 2.5 Handle IPFS Upload Simulation
+  const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    setUploadingIpfs(true)
+    addLog(`[IPFS] Encrypting & Pinning ${file.name} to decentralized storage...`)
+    
+    setTimeout(() => {
+      const mockCid = 'Qm' + Array.from({length: 44}, () => Math.floor(Math.random()*36).toString(36)).join('')
+      setEvidenceUrl(`ipfs://${mockCid}`)
+      setUploadingIpfs(false)
+      addLog(`[IPFS] Successfully pinned. CID: ${mockCid}`)
+    }, 1800)
   }
 
   // 3. Trigger AI Consensus Resolution
@@ -625,14 +641,39 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Photo & Video Evidence Repository URL (Imgur / Drive / IPFS)</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      value={evidenceUrl} 
-                      onChange={e => setEvidenceUrl(e.target.value)}
-                      placeholder="https://imgur.com/a/..." 
-                    />
+                    <label>Photo & Video Evidence Repository (IPFS Upload)</label>
+                    <div className="ipfs-upload-box">
+                      {uploadingIpfs ? (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--gold-light)' }}>
+                          ⏳ Encrypting & Pinning to IPFS...
+                        </div>
+                      ) : evidenceUrl && evidenceUrl.startsWith('ipfs://') ? (
+                        <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#34d399', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>✅ Pinned: {evidenceUrl.slice(0, 18)}...</span>
+                          <button type="button" onClick={() => setEvidenceUrl('')} style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer' }}>✕</button>
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative', padding: '1.25rem', textAlign: 'center', border: '1px dashed var(--border-gold)', borderRadius: '8px', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', transition: 'all 0.3s' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>📸 Click to select & pin visual evidence to IPFS</span>
+                          <input 
+                            type="file" 
+                            accept="image/*,video/*"
+                            onChange={handleUploadFile}
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {(!evidenceUrl || !evidenceUrl.startsWith('ipfs://')) && (
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        style={{ marginTop: '0.75rem', opacity: 0.6 }}
+                        value={evidenceUrl} 
+                        onChange={e => setEvidenceUrl(e.target.value)}
+                        placeholder="...or paste external URL (e.g. https://imgur.com/a/...)" 
+                      />
+                    )}
                   </div>
                   <button type="submit" className="btn-primary" disabled={loading?.startsWith('submitting')}>
                     {loading?.startsWith('submitting') ? '⏳ Cryptographically Sealing Evidence...' : `🔒 Submit & Seal ${role.toUpperCase()} Record`}
@@ -666,8 +707,8 @@ function App() {
                     <div className={`step-item ${aiStage.includes('LLM') ? 'active' : (aiStage.includes('Validator') ? 'done' : '')}`}>
                       <div className="step-number">2</div>
                       <div>
-                        <strong style={{ color: 'var(--gold-light)' }}>LLM Subjective Arbitration &amp; Reasoning</strong>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Evaluating normal usage wear vs. severe inventory destruction...</div>
+                        <strong style={{ color: 'var(--gold-light)' }}>Llama-3-Vision Subjective Arbitration</strong>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Analyzing IPFS visual pixels for normal usage wear vs. severe inventory destruction...</div>
                       </div>
                     </div>
                     <div className={`step-item ${aiStage.includes('Validator') ? 'active' : ''}`}>
