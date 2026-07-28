@@ -2,10 +2,8 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 from genlayer import *
 import json
-from dataclasses import dataclass
 
 @allow_storage
-@dataclass
 class Escrow:
     landlord: Address
     tenant: Address
@@ -21,8 +19,8 @@ class Escrow:
     landlord_description: str
     landlord_evidence_url: str
     resolved: bool
-    verdict: str       # NORMAL_WEAR, DAMAGE, or DISPUTE_ESCALATE
-    reason: str        # Detailed AI explanation from LLM
+    verdict: str
+    reason: str
     landlord_payout: bigint
     tenant_payout: bigint
 
@@ -31,7 +29,7 @@ class Contract:
     escrows: TreeMap[str, Escrow]
 
     def __init__(self):
-        # TUYỆT ĐỐI CẤM reassign TreeMap() / DynArray() trong __init__ theo quy tắc GenLayer
+        # Do not reassign TreeMap or DynArray in __init__ per GenLayer storage guidelines
         pass
         
     def create_escrow(self, escrow_id: str, landlord: Address, tenant: Address, amount: bigint) -> bool:
@@ -112,11 +110,11 @@ class Contract:
             raise Exception("At least one party must submit evidence before triggering AI judge resolution")
 
         def leader_fn():
-            # 1. Dùng nondet.web.render đọc URL listing gốc (Airbnb/Booking)
+            # 1. Fetch original listing content via nondet.web.render
             target_listing = escrow.landlord_listing_url if escrow.landlord_listing_url != "" else escrow.tenant_listing_url
             listing_html = nondet.web.render(target_listing) if target_listing != "" else "No original listing URL provided."
             
-            # 2. Dùng nondet.web.render đọc URL ảnh/evidence (Google Drive / Imgur) của 2 bên
+            # 2. Fetch evidence renders from both parties
             tenant_ev_html = nondet.web.render(escrow.tenant_evidence_url) if escrow.tenant_evidence_url != "" else "No tenant evidence URL provided."
             landlord_ev_html = nondet.web.render(escrow.landlord_evidence_url) if escrow.landlord_evidence_url != "" else "No landlord evidence URL provided."
             
@@ -159,12 +157,12 @@ class Contract:
             return json.loads(cleaned_str.strip())
             
         def validator_fn(leader_result, my_result):
-            # Quy tắc bắt buộc: Validator CHỈ so khớp verdict, bỏ qua hoàn toàn khác biệt câu chữ ở reason
+            # Strict rule: Validators only compare verdict, ignoring wording differences in reason
             leader_verdict = leader_result.get("verdict")
             validator_verdict = my_result.get("verdict")
             return leader_verdict == validator_verdict
             
-        # Dùng vm.run_nondet thực thi Intelligent Contract
+        # Execute Intelligent Contract Nondet execution
         result = vm.run_nondet(leader_fn, validator_fn)
         
         verdict_str = str(result.get("verdict", "DISPUTE_ESCALATE"))
@@ -176,18 +174,14 @@ class Contract:
         if damage_pct > 100:
             damage_pct = 100
             
-        # Tính toán chia tiền (Cả 2 bên đều đã khóa deposit_amount)
         if verdict_str == "NORMAL_WEAR":
-            # Tenant nhận lại trọn vẹn tiền đặt cọc, Landlord nhận lại phần khóa của mình
             escrow.landlord_payout = escrow.deposit_amount
             escrow.tenant_payout = escrow.deposit_amount
         elif verdict_str == "DAMAGE":
-            # Landlord nhận phần bồi thường từ tiền đặt cọc của Tenant + tiền khóa của mình
             penalty = (escrow.deposit_amount * bigint(damage_pct)) // bigint(100)
             escrow.landlord_payout = escrow.deposit_amount + penalty
             escrow.tenant_payout = escrow.deposit_amount - penalty
         else:
-            # DISPUTE_ESCALATE: Giữ tiền trong escrow, payout = 0 chờ xử lý escalation
             escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = bigint(0)
 
