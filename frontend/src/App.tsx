@@ -85,6 +85,28 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     specs: '7 Bed • 11,000 sq ft • Infinity Pool & Vault',
     listingUrl: 'https://www.airbnb.com/rooms/la-beverly-hills-infinity-estate-9931',
     landlordAddress: '0x4D2A9e8B1C7f3E0A5b6C9D1a2F4e7A8B0c3E6D9F'
+  },
+  {
+    id: 'SG-MARINABAY-12',
+    title: 'Singapore Marina Bay Sky Residence',
+    location: 'Marina Bay, Singapore',
+    price: '4.80 ETH / month',
+    deposit: '4800',
+    image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=80',
+    specs: '4 Bed • 5,200 sq ft • Infinity Pool',
+    listingUrl: 'https://www.airbnb.com/rooms/singapore-marina-bay-sky-12',
+    landlordAddress: '0x9E3F1c4B5A6d7B8c9F0D1E2A3B4C5D6E7F8a9B0C'
+  },
+  {
+    id: 'TYO-ROPPONGI-05',
+    title: 'Tokyo Roppongi Hills Penthouse',
+    location: 'Roppongi, Tokyo, Japan',
+    price: '3.90 ETH / month',
+    deposit: '3900',
+    image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80',
+    specs: '3 Bed • 3,800 sq ft • Private Onsen & City View',
+    listingUrl: 'https://www.airbnb.com/rooms/tokyo-roppongi-hills-penthouse',
+    landlordAddress: '0x5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D'
   }
 ]
 
