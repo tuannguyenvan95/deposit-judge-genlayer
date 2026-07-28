@@ -91,7 +91,6 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
 function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'evidence' | 'judge'>('create')
   const [contractAddress, setContractAddress] = useState(DEFAULT_CONTRACT_ADDRESS)
-  const [connectionStatus] = useState<string>('Connected to studionet ⚡')
 
   // Web3 Wallet Connection State
   const [showWalletModal, setShowWalletModal] = useState(false)
@@ -367,9 +366,9 @@ function App() {
         </a>
 
         <div className="nav-controls">
-          <div className="network-badge" title={connectionStatus}>
+          <div className="network-badge" title="Connected to studionet">
             <span className="pulse-dot"></span>
-            GenLayer Studionet v0.2.16 • {connectionStatus}
+            GenLayer Studionet v0.2.16
           </div>
           
           <div className="contract-input-box">

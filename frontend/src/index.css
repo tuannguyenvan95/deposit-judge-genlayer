@@ -113,7 +113,7 @@ body {
   margin: 1.5rem 0 2rem;
   background: rgba(12, 15, 22, 0.92);
   border: 1px solid var(--border-gold);
-  border-radius: 999px;
+  border-radius: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 175, 55, 0.15);
 }
 
@@ -217,7 +217,7 @@ body {
   color: var(--text-main);
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
-  width: 320px;
+  width: 200px;
   outline: none;
 }
 
