@@ -111,7 +111,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
 ]
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'create' | 'evidence' | 'judge'>('create')
+  const [activeTab, setActiveTab] = useState<'create' | 'evidence' | 'judge' | 'profile'>('create')
   const [contractAddress, setContractAddress] = useState(DEFAULT_CONTRACT_ADDRESS)
 
   // Web3 Wallet Connection State
@@ -499,6 +499,12 @@ function App() {
         >
           <span>🏛️ 3. AI Supreme Judge Tribunal</span>
         </button>
+        <button 
+          className={`console-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          <span>👤 4. Executive Profile &amp; History</span>
+        </button>
       </div>
 
       {/* Main Executive Console Grid */}
@@ -692,6 +698,67 @@ function App() {
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '1.25rem', fontFamily: 'Plus Jakarta Sans', fontWeight: '700' }}>
                       <div>🏰 Landlord Compensation: <span style={{ color: '#f3e5ab' }}>{currentEscrow.landlordPayout} GEN</span></div>
                       <div>👤 Tenant Refund: <span style={{ color: '#34d399' }}>{currentEscrow.tenantPayout} GEN</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
+            <div>
+              <div className="panel-header">
+                <h2 className="panel-title"><span>👤</span> Executive Profile &amp; History</h2>
+              </div>
+              <div className="panel-body">
+                {!walletConnected ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+                    <h3 style={{ fontFamily: 'Playfair Display', color: 'var(--gold-light)', fontSize: '1.4rem' }}>Vault Access Restricted</h3>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Please connect your Web3 Executive Signer to view your past lease history and portfolio statistics.</p>
+                    <button className="btn-primary" onClick={() => setShowWalletModal(true)} style={{ width: 'auto', padding: '0.75rem 2rem' }}>
+                      ⚡ Connect Web3 Wallet
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ background: 'rgba(212, 175, 55, 0.05)', border: '1px solid var(--border-gold)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'var(--gold-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem' }}>👑</div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Authenticated Signer</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: '700', fontFamily: 'JetBrains Mono', color: 'var(--text-main)' }}>{walletAddress}</div>
+                          <div style={{ color: 'var(--gold-light)', fontSize: '0.9rem', marginTop: '0.2rem' }}>Balance: {walletBalance}</div>
+                        </div>
+                      </div>
+                      <button className="btn-secondary" onClick={handleDisconnectWallet} style={{ borderColor: '#ef4444', color: '#fca5a5' }}>Disconnect</button>
+                    </div>
+                    
+                    <h3 style={{ fontFamily: 'Playfair Display', fontSize: '1.25rem', color: 'var(--gold-light)', marginBottom: '1rem' }}>Recent Escrow History</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <strong style={{ color: 'var(--text-main)', fontSize: '1.1rem' }}>NYC-TRIBECA-88</strong>
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '0.2rem 0.75rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '700' }}>NORMAL WEAR</span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>Tribeca Skyview Manhattan Loft • Ended Jul 15, 2026</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: '600' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Deposit: <span style={{ color: 'var(--gold-light)' }}>3500 GEN</span></span>
+                          <span style={{ color: 'var(--text-muted)' }}>Refunded: <span style={{ color: '#34d399' }}>3500 GEN</span></span>
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <strong style={{ color: 'var(--text-main)', fontSize: '1.1rem' }}>PARIS-ELYSEES-07</strong>
+                          <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', padding: '0.2rem 0.75rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '700' }}>DAMAGE CLAIM</span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>Château de Champs-Élysées Villa • Ended Jun 22, 2026</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: '600' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Deposit: <span style={{ color: 'var(--gold-light)' }}>4200 GEN</span></span>
+                          <span style={{ color: 'var(--text-muted)' }}>Refunded: <span style={{ color: '#fca5a5' }}>3100 GEN (26% Deduction)</span></span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
