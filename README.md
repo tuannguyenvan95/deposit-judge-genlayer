@@ -10,7 +10,7 @@ Traditional blockchains cannot process subjective real-world evidence such as pr
 - **GenLayer Explorer**: [https://genlayer-explorer.vercel.app/address/0x3316cF283e8E9709c5DE8eA4dE0B4D3f4bfc46Db](https://genlayer-explorer.vercel.app/address/0x3316cF283e8E9709c5DE8eA4dE0B4D3f4bfc46Db)
 
 ## Live App
-- Deploying to Vercel...
+- **Vercel Production DApp**: [https://deposit-judge-genlayer.vercel.app](https://deposit-judge-genlayer.vercel.app)
 
 ## Local Development
 
