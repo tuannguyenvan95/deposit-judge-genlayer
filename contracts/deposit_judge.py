@@ -2,8 +2,10 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 from genlayer import *
 import json
+from dataclasses import dataclass
 
 @allow_storage
+@dataclass
 class Escrow:
     landlord: Address
     tenant: Address
@@ -19,19 +21,19 @@ class Escrow:
     landlord_description: str
     landlord_evidence_url: str
     resolved: bool
-    verdict: str
-    reason: str
+    verdict: str       # NORMAL_WEAR, DAMAGE, or DISPUTE_ESCALATE
+    reason: str        # Detailed AI explanation from LLM
     landlord_payout: bigint
     tenant_payout: bigint
 
-@contract
-class Contract:
+class DepositJudge(gl.Contract):
     escrows: TreeMap[str, Escrow]
 
     def __init__(self):
-        # Do not reassign TreeMap or DynArray in __init__ per GenLayer storage guidelines
+        # Do not reassign TreeMap or DynArray in constructor
         pass
         
+    @gl.public.write
     def create_escrow(self, escrow_id: str, landlord: Address, tenant: Address, amount: bigint) -> bool:
         if escrow_id in self.escrows:
             raise Exception("Escrow ID already exists")
@@ -58,6 +60,7 @@ class Contract:
         )
         return True
 
+    @gl.public.write
     def fund_escrow_landlord(self, escrow_id: str) -> bool:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
@@ -66,6 +69,7 @@ class Contract:
         self.escrows[escrow_id] = escrow
         return True
 
+    @gl.public.write
     def fund_escrow_tenant(self, escrow_id: str) -> bool:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
@@ -74,6 +78,7 @@ class Contract:
         self.escrows[escrow_id] = escrow
         return True
 
+    @gl.public.write
     def submit_evidence(self, escrow_id: str, role: str, listing_url: str, description: str, evidence_url: str) -> bool:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
@@ -100,6 +105,7 @@ class Contract:
         self.escrows[escrow_id] = escrow
         return True
 
+    @gl.public.write
     def resolve_dispute(self, escrow_id: str) -> str:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
@@ -110,13 +116,11 @@ class Contract:
             raise Exception("At least one party must submit evidence before triggering AI judge resolution")
 
         def leader_fn():
-            # 1. Fetch original listing content via nondet.web.render
             target_listing = escrow.landlord_listing_url if escrow.landlord_listing_url != "" else escrow.tenant_listing_url
-            listing_html = nondet.web.render(target_listing) if target_listing != "" else "No original listing URL provided."
+            listing_html = gl.nondet.web.render(target_listing) if target_listing != "" else "No original listing URL provided."
             
-            # 2. Fetch evidence renders from both parties
-            tenant_ev_html = nondet.web.render(escrow.tenant_evidence_url) if escrow.tenant_evidence_url != "" else "No tenant evidence URL provided."
-            landlord_ev_html = nondet.web.render(escrow.landlord_evidence_url) if escrow.landlord_evidence_url != "" else "No landlord evidence URL provided."
+            tenant_ev_html = gl.nondet.web.render(escrow.tenant_evidence_url) if escrow.tenant_evidence_url != "" else "No tenant evidence URL provided."
+            landlord_ev_html = gl.nondet.web.render(escrow.landlord_evidence_url) if escrow.landlord_evidence_url != "" else "No landlord evidence URL provided."
             
             prompt = f"""
             You are an AI judge representing the DepositJudge decentralized escrow protocol on the GenLayer network.
@@ -145,7 +149,7 @@ class Contract:
             - "reason": thorough, detailed reasoning explaining why this judgment was reached based on the rendered evidence and descriptions.
             """
             
-            result_str = nondet.exec_prompt(prompt)
+            result_str = gl.nondet.exec_prompt(prompt)
             cleaned_str = result_str.strip()
             if cleaned_str.startswith("```json"):
                 cleaned_str = cleaned_str[7:]
@@ -157,13 +161,11 @@ class Contract:
             return json.loads(cleaned_str.strip())
             
         def validator_fn(leader_result, my_result):
-            # Strict rule: Validators only compare verdict, ignoring wording differences in reason
             leader_verdict = leader_result.get("verdict")
             validator_verdict = my_result.get("verdict")
             return leader_verdict == validator_verdict
             
-        # Execute Intelligent Contract Nondet execution
-        result = vm.run_nondet(leader_fn, validator_fn)
+        result = gl.vm.run_nondet(leader_fn, validator_fn)
         
         verdict_str = str(result.get("verdict", "DISPUTE_ESCALATE"))
         reason_str = str(result.get("reason", "No reasoning generated."))
@@ -192,6 +194,7 @@ class Contract:
         
         return verdict_str
 
+    @gl.public.view
     def get_escrow(self, escrow_id: str) -> str:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
