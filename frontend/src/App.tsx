@@ -388,20 +388,22 @@ function App() {
         </a>
 
         <div className="nav-controls">
-          <div className="network-badge" title="Connected to studionet">
-            <span className="pulse-dot"></span>
-            GenLayer Studionet v0.2.16
-          </div>
-          
-          <div className="contract-input-box">
-            <span>VAULT:</span>
-            <input 
-              type="text" 
-              value={contractAddress} 
-              onChange={(e) => setContractAddress(e.target.value)}
-              placeholder="Contract Address..."
-              title="GenLayer Studio Contract Address"
-            />
+          <div className="nav-info-row">
+            <div className="network-badge" title="Connected to studionet">
+              <span className="pulse-dot"></span>
+              GenLayer Studionet v0.2.16
+            </div>
+            
+            <div className="contract-input-box">
+              <span>VAULT:</span>
+              <input 
+                type="text" 
+                value={contractAddress} 
+                onChange={(e) => setContractAddress(e.target.value)}
+                placeholder="Contract Address..."
+                title="GenLayer Studio Contract Address"
+              />
+            </div>
           </div>
 
           {/* Connect Web3 Wallet Button */}
