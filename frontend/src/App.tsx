@@ -415,14 +415,26 @@ function App() {
     // Call the AI consensus execution on GenLayer
     try {
       const client = getClient()
-      const txHash = await client.writeContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'resolve_dispute',
-        args: [currentEscrow.escrowId],
-        value: 0n
-      })
       
-      setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
+      addLog(`[Chain] Sending resolve_dispute transaction...`)
+      let txHash
+      try {
+        txHash = await client.writeContract({
+          address: contractAddress as `0x${string}`,
+          functionName: 'resolve_dispute',
+          args: [currentEscrow.escrowId],
+          value: 0n
+        })
+      } catch (writeErr) {
+        addLog(`[Error] Transaction rejected or contract reverted: ${String(writeErr)}`)
+        addLog(`[Hint] Make sure escrow '${currentEscrow.escrowId}' exists on contract ${contractAddress} and evidence was submitted on-chain.`)
+        setAiStage('')
+        setLoading(null)
+        return
+      }
+      
+      setAiStage('Waiting for validators to execute LLM prompt and reach consensus... (this may take 30-60 seconds)')
+      addLog(`[Chain] Transaction sent: ${txHash}. Waiting for AI consensus...`)
       await client.waitForTransactionReceipt({ hash: txHash })
       
       // Read the REAL result from the on-chain contract after AI consensus
@@ -918,7 +930,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.95rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Security Deposit Vault:</span>
-                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN/GEN</span>
+                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Landlord Executive Address:</span>
