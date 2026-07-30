@@ -272,7 +272,7 @@ function App() {
         args: [escrowId, landlord, tenant, amountInWei],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHashCreate, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHashCreate })
 
       // 2. Fund Escrow (Tenant)
       addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
@@ -282,7 +282,7 @@ function App() {
         args: [escrowId],
         value: amountInWei
       })
-      await client.waitForTransactionReceipt({ hash: txHashFund, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHashFund })
 
       const newEscrow: EscrowState = {
         escrowId,
@@ -339,7 +339,7 @@ function App() {
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHash })
 
       const updated = { ...currentEscrow }
       if (role === 'tenant') {
@@ -404,7 +404,7 @@ function App() {
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHash })
       
       // For demo UI purposes, we simulate the parsed result since readContract isn't fully implemented in this UI
       // In production, we would use readContract to get the final state.
