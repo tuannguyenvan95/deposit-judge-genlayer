@@ -303,30 +303,45 @@ function App() {
       })
       await client.waitForTransactionReceipt({ hash: txHashFund })
 
+      // 3. Read back on-chain state to confirm
+      addLog(`[On-Chain] Verifying escrow state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [escrowId]
+      })
+
+      let onChainData: any = {}
+      try {
+        onChainData = JSON.parse(escrowDataRaw as string)
+      } catch (e) {
+        addLog(`[Warning] Could not parse on-chain verification: ${String(e)}`)
+      }
+
       const newEscrow: EscrowState = {
         escrowId,
-        landlord,
-        tenant,
+        landlord: onChainData.landlord || landlord,
+        tenant: onChainData.tenant || tenant,
         depositAmount: amount,
-        landlordFunded: true,
-        tenantFunded: true,
-        tenantSubmitted: false,
-        tenantListingUrl: '',
-        tenantDescription: '',
-        tenantEvidenceUrl: '',
-        landlordSubmitted: false,
-        landlordListingUrl: '',
-        landlordDescription: '',
-        landlordEvidenceUrl: '',
-        resolved: false,
-        verdict: 'PENDING',
-        reason: 'Awaiting evidence submission and AI Tribunal consensus.',
-        landlordPayout: '0',
-        tenantPayout: '0'
+        landlordFunded: onChainData.landlord_funded ?? true,
+        tenantFunded: onChainData.tenant_funded ?? true,
+        tenantSubmitted: onChainData.tenant_evidence_submitted ?? false,
+        tenantListingUrl: onChainData.tenant_listing_url || '',
+        tenantDescription: onChainData.tenant_description || '',
+        tenantEvidenceUrl: onChainData.tenant_evidence_url || '',
+        landlordSubmitted: onChainData.landlord_evidence_submitted ?? false,
+        landlordListingUrl: onChainData.landlord_listing_url || '',
+        landlordDescription: onChainData.landlord_description || '',
+        landlordEvidenceUrl: onChainData.landlord_evidence_url || '',
+        resolved: onChainData.resolved ?? false,
+        verdict: onChainData.verdict || 'PENDING',
+        reason: onChainData.reason || 'Awaiting evidence submission and AI Tribunal consensus.',
+        landlordPayout: onChainData.landlord_payout || '0',
+        tenantPayout: onChainData.tenant_payout || '0'
       }
 
       setCurrentEscrow(newEscrow)
-      addLog(`[Success] Escrow registered on studionet! Deposit locked: ${amount} GEN.`)
+      addLog(`[Success] Escrow registered and funded on-chain! Deposit locked: ${amount} GEN. Tenant funded: ${newEscrow.tenantFunded}`)
       setActiveTab('evidence')
     } catch (err) {
       console.error(err)
@@ -360,17 +375,31 @@ function App() {
       })
       await client.waitForTransactionReceipt({ hash: txHash })
 
-      const updated = { ...currentEscrow }
-      if (role === 'tenant') {
-        updated.tenantSubmitted = true
-        updated.tenantListingUrl = listingUrl
-        updated.tenantDescription = description
-        updated.tenantEvidenceUrl = evidenceUrl
-      } else {
-        updated.landlordSubmitted = true
-        updated.landlordListingUrl = listingUrl
-        updated.landlordDescription = description
-        updated.landlordEvidenceUrl = evidenceUrl
+      // Read back on-chain state to confirm evidence was stored
+      addLog(`[On-Chain] Verifying evidence state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [currentEscrow.escrowId]
+      })
+
+      let onChainData: any = {}
+      try {
+        onChainData = JSON.parse(escrowDataRaw as string)
+      } catch (e) {
+        addLog(`[Warning] Could not parse on-chain data: ${String(e)}`)
+      }
+
+      const updated: EscrowState = {
+        ...currentEscrow,
+        tenantSubmitted: onChainData.tenant_evidence_submitted ?? currentEscrow.tenantSubmitted,
+        tenantListingUrl: onChainData.tenant_listing_url || currentEscrow.tenantListingUrl,
+        tenantDescription: onChainData.tenant_description || currentEscrow.tenantDescription,
+        tenantEvidenceUrl: onChainData.tenant_evidence_url || currentEscrow.tenantEvidenceUrl,
+        landlordSubmitted: onChainData.landlord_evidence_submitted ?? currentEscrow.landlordSubmitted,
+        landlordListingUrl: onChainData.landlord_listing_url || currentEscrow.landlordListingUrl,
+        landlordDescription: onChainData.landlord_description || currentEscrow.landlordDescription,
+        landlordEvidenceUrl: onChainData.landlord_evidence_url || currentEscrow.landlordEvidenceUrl,
       }
 
       setCurrentEscrow(updated)
@@ -415,54 +444,37 @@ function App() {
     // Call the AI consensus execution on GenLayer
     try {
       const client = getClient()
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'resolve_dispute',
+        args: [currentEscrow.escrowId],
+        value: 0n
+      })
       
-      addLog(`[Chain] Sending resolve_dispute transaction...`)
-      let txHash
-      try {
-        txHash = await client.writeContract({
-          address: contractAddress as `0x${string}`,
-          functionName: 'resolve_dispute',
-          args: [currentEscrow.escrowId],
-          value: 0n
-        })
-      } catch (writeErr) {
-        addLog(`[Error] Transaction rejected or contract reverted: ${String(writeErr)}`)
-        addLog(`[Hint] Make sure escrow '${currentEscrow.escrowId}' exists on contract ${contractAddress} and evidence was submitted on-chain.`)
-        setAiStage('')
-        setLoading(null)
-        return
-      }
-      
-      setAiStage('Waiting for validators to execute LLM prompt and reach consensus... (this may take 30-60 seconds)')
-      addLog(`[Chain] Transaction sent: ${txHash}. Waiting for AI consensus...`)
+      setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
       await client.waitForTransactionReceipt({ hash: txHash })
-      addLog(`[Chain] AI consensus transaction confirmed on-chain!`)
       
-      // Read the REAL result using a read-only client (no MetaMask provider needed for view calls)
-      let verdict = 'RESOLVED'
-      let reason = 'Transaction confirmed on GenLayer. AI consensus reached.'
+      // Read actual on-chain result from the contract
+      addLog(`[On-Chain] Reading escrow state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [currentEscrow.escrowId]
+      })
+      
+      let verdict = 'DISPUTE_ESCALATE'
+      let reason = 'Unable to parse on-chain result.'
       let landlordPayout = '0'
       let tenantPayout = '0'
 
       try {
-        addLog(`[Chain] Reading finalized escrow state from contract...`)
-        const readClient = createClient({ chain: studionet, account: createAccount() })
-        const escrowDataRaw = await readClient.readContract({
-          address: contractAddress as `0x${string}`,
-          functionName: 'get_escrow',
-          args: [currentEscrow.escrowId]
-        })
-
         const escrowData = JSON.parse(escrowDataRaw as string)
-        verdict = escrowData.verdict || 'RESOLVED'
-        reason = escrowData.reason || 'AI consensus completed on-chain.'
+        verdict = escrowData.verdict || 'DISPUTE_ESCALATE'
+        reason = escrowData.reason || 'No reasoning returned from AI consensus.'
         landlordPayout = escrowData.landlord_payout || '0'
         tenantPayout = escrowData.tenant_payout || '0'
-        addLog(`[Chain] On-chain verdict: ${verdict}`)
-      } catch (readErr) {
-        addLog(`[Warning] Could not read final state from chain: ${String(readErr)}`)
-        addLog(`[Info] Transaction was confirmed. Verdict was written on-chain but frontend could not fetch it.`)
-        reason = 'AI consensus transaction confirmed on GenLayer. View result on GenLayer Explorer.'
+      } catch (parseErr) {
+        addLog(`[Warning] Could not parse on-chain escrow data: ${String(parseErr)}`)
       }
 
       const resolvedEscrow: EscrowState = {
@@ -933,7 +945,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.95rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Security Deposit Vault:</span>
-                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN</span>
+                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN/GEN</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Landlord Executive Address:</span>
