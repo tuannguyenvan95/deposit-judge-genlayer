@@ -334,8 +334,7 @@ function App() {
       }
 
       if (!onChainData) {
-        addLog(`[Warning] Could not verify on-chain state after 15 attempts. It may still be processing.`);
-        onChainData = {};
+        throw new Error(`Could not verify on-chain state after 15 attempts. Network might be slow or transaction reverted.`)
       }
 
       const newEscrow: EscrowState = {
@@ -394,10 +393,12 @@ function App() {
         value: 0n
       })
       const receipt = await client.waitForTransactionReceipt({ hash: txHash })
-      if ((receipt as any).status === 7) {
+      if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
          throw new Error("Transaction reverted on-chain (Status: ERROR)");
       }
-      addLog(`[On-Chain] Verifying evidence state from contract (waiting for nodes)...`)
+      
+      // Read back on-chain state to confirm evidence was stored (with polling)
+      addLog(`[On-Chain] Verifying evidence state for ${currentEscrow.escrowId}...`)
       
       let onChainData: any = null;
       for (let attempt = 1; attempt <= 15; attempt++) {
@@ -424,8 +425,7 @@ function App() {
       }
 
       if (!onChainData) {
-        addLog(`[Warning] Could not verify on-chain state after 10 attempts. It may still be processing.`);
-        onChainData = {};
+        throw new Error(`Could not verify on-chain state after 15 attempts. It may still be processing or the transaction reverted.`);
       }
 
       const updated: EscrowState = {
@@ -491,7 +491,7 @@ function App() {
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
       const receipt = await client.waitForTransactionReceipt({ hash: txHash })
-      if ((receipt as any).status === 7) {
+      if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
          throw new Error("Transaction reverted on-chain (Status: ERROR)");
       }
       
