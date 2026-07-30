@@ -285,10 +285,11 @@ function App() {
       })()
 
       // 1. Create Escrow Structure
+      const uniqueEscrowId = `${escrowId}-${Math.floor(Math.random() * 1000000)}`
       const txHashCreate = await client.writeContract({
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
-        args: [escrowId, landlord, tenant, amountInWei],
+        args: [uniqueEscrowId, landlord, tenant, amountInWei],
         value: 0n
       })
       await client.waitForTransactionReceipt({ hash: txHashCreate, status: 4 as any })
@@ -298,7 +299,7 @@ function App() {
       const txHashFund = await client.writeContract({
         address: contractAddress as `0x${string}`,
         functionName: 'fund_escrow_tenant',
-        args: [escrowId],
+        args: [uniqueEscrowId],
         value: amountInWei
       })
       await client.waitForTransactionReceipt({ hash: txHashFund, status: 4 as any })
@@ -308,7 +309,7 @@ function App() {
       const escrowDataRaw = await client.readContract({
         address: contractAddress as `0x${string}`,
         functionName: 'get_escrow',
-        args: [escrowId]
+        args: [uniqueEscrowId]
       })
 
       let onChainData: any = {}
@@ -319,7 +320,7 @@ function App() {
       }
 
       const newEscrow: EscrowState = {
-        escrowId,
+        escrowId: uniqueEscrowId,
         landlord: onChainData.landlord || landlord,
         tenant: onChainData.tenant || tenant,
         depositAmount: amount,
