@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient, createAccount } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
 import './index.css'
@@ -139,6 +139,25 @@ function App() {
   const [loading, setLoading] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [aiStage, setAiStage] = useState<string>('')
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        try {
+          const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' })
+          if (accounts && accounts.length > 0) {
+            setWalletConnected(true)
+            setWalletType('MetaMask (Injected)')
+            setWalletAddress(accounts[0])
+            setWalletBalance('Checking...')
+          }
+        } catch (err) {
+          console.error("Failed to re-hydrate wallet connection:", err)
+        }
+      }
+    }
+    checkConnection()
+  }, [])
 
   // Add diagnostic log message
   const addLog = (msg: string) => {
