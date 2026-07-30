@@ -292,7 +292,10 @@ function App() {
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHashCreate })
+      const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
+      if ((receiptCreate as any).status === 7) {
+         throw new Error("create_escrow reverted on-chain (Status: ERROR)");
+      }
 
       // 2. Fund Escrow (Tenant)
       addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
@@ -302,31 +305,36 @@ function App() {
         args: [uniqueEscrowId],
         value: amountInWei
       })
-      await client.waitForTransactionReceipt({ hash: txHashFund })
+      const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
+      if ((receiptFund as any).status === 7) {
+         throw new Error("fund_escrow_tenant reverted on-chain (Status: ERROR)");
+      }
 
       // 3. Read back on-chain state to confirm (with polling)
       addLog(`[On-Chain] Verifying escrow state from contract (waiting for nodes)...`)
       let onChainData: any = null;
-      for (let attempt = 1; attempt <= 10; attempt++) {
+      for (let attempt = 1; attempt <= 15; attempt++) {
         try {
           const escrowDataRaw = await client.readContract({
             address: contractAddress as `0x${string}`,
             functionName: 'get_escrow',
             args: [uniqueEscrowId]
           });
-          onChainData = JSON.parse(escrowDataRaw as string);
-          if (onChainData) {
+          const parsed = JSON.parse(escrowDataRaw as string);
+          if (parsed && parsed.tenant_funded) {
+            onChainData = parsed;
             addLog(`[Success] Verified on-chain data for ${uniqueEscrowId}`);
             break;
           }
         } catch (e) {
-          addLog(`[Polling] Attempt ${attempt}/10: Data not yet available on node...`);
-          await new Promise(r => setTimeout(r, 2000));
+          // ignore error and retry
         }
+        addLog(`[Polling] Attempt ${attempt}/15: Data not yet updated on node...`);
+        await new Promise(r => setTimeout(r, 2000));
       }
 
       if (!onChainData) {
-        addLog(`[Warning] Could not verify on-chain state after 10 attempts. It may still be processing.`);
+        addLog(`[Warning] Could not verify on-chain state after 15 attempts. It may still be processing.`);
         onChainData = {};
       }
 
@@ -385,13 +393,14 @@ function App() {
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHash })
-
-      // Read back on-chain state to confirm evidence was stored (with polling)
+      const receipt = await client.waitForTransactionReceipt({ hash: txHash })
+      if ((receipt as any).status === 7) {
+         throw new Error("Transaction reverted on-chain (Status: ERROR)");
+      }
       addLog(`[On-Chain] Verifying evidence state from contract (waiting for nodes)...`)
       
       let onChainData: any = null;
-      for (let attempt = 1; attempt <= 10; attempt++) {
+      for (let attempt = 1; attempt <= 15; attempt++) {
         try {
           const escrowDataRaw = await client.readContract({
             address: contractAddress as `0x${string}`,
@@ -407,9 +416,9 @@ function App() {
             addLog(`[Success] Verified on-chain evidence for ${role}`);
             break;
           }
-          throw new Error("Evidence not yet visible in state");
-        } catch (e) {
-          addLog(`[Polling] Attempt ${attempt}/10: Data not yet updated on node...`);
+          throw new Error("State fetched but evidence field is still false.");
+        } catch (e: any) {
+          addLog(`[Polling] Attempt ${attempt}/15: ${e.message}`);
           await new Promise(r => setTimeout(r, 2000));
         }
       }
@@ -481,7 +490,10 @@ function App() {
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      await client.waitForTransactionReceipt({ hash: txHash })
+      const receipt = await client.waitForTransactionReceipt({ hash: txHash })
+      if ((receipt as any).status === 7) {
+         throw new Error("Transaction reverted on-chain (Status: ERROR)");
+      }
       
       // Read actual on-chain result from the contract (with polling)
       addLog(`[On-Chain] Reading escrow state from contract (waiting for consensus)...`)
