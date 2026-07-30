@@ -326,7 +326,7 @@ function App() {
       }
 
       setCurrentEscrow(newEscrow)
-      addLog(`[Success] Escrow registered on studionet! Deposit locked: ${amount} GEN/GEN equivalent.`)
+      addLog(`[Success] Escrow registered on studionet! Deposit locked: ${amount} GEN.`)
       setActiveTab('evidence')
     } catch (err) {
       console.error(err)
@@ -425,47 +425,44 @@ function App() {
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
       await client.waitForTransactionReceipt({ hash: txHash })
       
-      // For demo UI purposes, we simulate the parsed result since readContract isn't fully implemented in this UI
-      // In production, we would use readContract to get the final state.
-      const descriptionText = (currentEscrow.landlordDescription + ' ' + currentEscrow.tenantDescription).toLowerCase()
+      // Read the REAL result from the on-chain contract after AI consensus
+      addLog(`[Chain] Reading finalized escrow state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [currentEscrow.escrowId]
+      })
+
       let verdict = 'NORMAL_WEAR'
-      let damagePct = 0
-      let reason = 'AI Tribunal Consensus: Check-out photos indicate only customary surface wear consistent with standard residency. No structural breaches or appliance damage verified. Full security deposit refunded to Tenant.'
+      let reason = 'Resolved on-chain.'
+      let landlordPayout = '0'
+      let tenantPayout = '0'
 
-      if (descriptionText.includes('burn') || descriptionText.includes('shattered') || descriptionText.includes('missing') || descriptionText.includes('broken') || descriptionText.includes('fracture') || descriptionText.includes('oxidation')) {
-        verdict = 'DAMAGE'
-        damagePct = 35
-        reason = 'AI Tribunal Consensus: Visual examination confirms severe thermal and oxidation staining on luxury stone furnishings along with fractured interior decor. Landlord claim corroborated by listing inventory baseline. A 35% compensation deduction is awarded to Landlord.'
-      } else if (descriptionText.includes('fraud') || descriptionText.includes('fake') || descriptionText.includes('unclear')) {
-        verdict = 'DISPUTE_ESCALATE'
-        reason = 'AI Tribunal Consensus: Contradictory evidence metadata requires direct physical inspection by GenLayer arbitration governors. Funds remain locked in decentralized vault.'
+      try {
+        const escrowData = JSON.parse(escrowDataRaw as string)
+        verdict = escrowData.verdict || 'NORMAL_WEAR'
+        reason = escrowData.reason || 'No reasoning returned from AI consensus.'
+        landlordPayout = escrowData.landlord_payout || '0'
+        tenantPayout = escrowData.tenant_payout || '0'
+        addLog(`[Chain] On-chain verdict: ${verdict}`)
+      } catch (parseErr) {
+        addLog(`[Warning] Could not parse on-chain result, using raw: ${String(escrowDataRaw)}`)
+        reason = String(escrowDataRaw)
       }
 
-      const depositVal = parseInt(currentEscrow.depositAmount) || 0
-      let landlordPayout = 0
-      let tenantPayout = 0
-
-      if (verdict === 'NORMAL_WEAR') {
-        tenantPayout = depositVal
-      } else if (verdict === 'DAMAGE') {
-        const penalty = Math.floor((depositVal * damagePct) / 100)
-        landlordPayout = penalty
-        tenantPayout = depositVal - penalty
+      const resolvedEscrow: EscrowState = {
+        ...currentEscrow,
+        resolved: true,
+        verdict,
+        reason,
+        landlordPayout,
+        tenantPayout
       }
 
-    const resolvedEscrow: EscrowState = {
-      ...currentEscrow,
-      resolved: true,
-      verdict,
-      reason,
-      landlordPayout: landlordPayout.toString(),
-      tenantPayout: tenantPayout.toString()
-    }
-
-    setCurrentEscrow(resolvedEscrow)
-    setAiStage('')
-    setLoading(null)
-    addLog(`[Consensus Finalized] Verdict: ${verdict}. Landlord: ${landlordPayout} GEN | Tenant: ${tenantPayout} GEN.`)
+      setCurrentEscrow(resolvedEscrow)
+      setAiStage('')
+      setLoading(null)
+      addLog(`[Consensus Finalized] Verdict: ${verdict}. Landlord: ${landlordPayout} GEN | Tenant: ${tenantPayout} GEN.`)
     } catch (err) {
       addLog(`[Error] Failed to resolve dispute on Studionet: ${String(err)}`)
       setAiStage('')
