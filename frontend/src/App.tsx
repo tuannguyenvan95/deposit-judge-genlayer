@@ -47,7 +47,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'The Royal Burj Dubai Penthouse',
     location: 'Downtown Dubai, UAE',
     price: '5.00 GEN / month',
-    deposit: '5000',
+    deposit: '5',
     image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
     specs: '6 Bed • 8,500 sq ft • Private Helipad',
     listingUrl: 'https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026',
@@ -58,7 +58,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'Tribeca Skyview Manhattan Loft',
     location: 'New York City, USA',
     price: '3.50 GEN / month',
-    deposit: '3500',
+    deposit: '3.5',
     image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
     specs: '3 Bed • 4,200 sq ft • Skyline Terrace',
     listingUrl: 'https://www.airbnb.com/rooms/ny-luxury-tribeca-loft-4291',
@@ -69,7 +69,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'Château de Champs-Élysées Villa',
     location: 'Paris, France',
     price: '4.20 GEN / month',
-    deposit: '4200',
+    deposit: '4.2',
     image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
     specs: '5 Bed • 6,100 sq ft • Historic Courtyard',
     listingUrl: 'https://www.airbnb.com/rooms/paris-elysees-villa-heritage-8820',
@@ -80,7 +80,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'Beverly Hills Glass Horizon Estate',
     location: 'Los Angeles, USA',
     price: '6.00 GEN / month',
-    deposit: '6000',
+    deposit: '6',
     image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
     specs: '7 Bed • 11,000 sq ft • Infinity Pool & Vault',
     listingUrl: 'https://www.airbnb.com/rooms/la-beverly-hills-infinity-estate-9931',
@@ -91,7 +91,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'Singapore Marina Bay Sky Residence',
     location: 'Marina Bay, Singapore',
     price: '4.80 GEN / month',
-    deposit: '4800',
+    deposit: '4.8',
     image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=80',
     specs: '4 Bed • 5,200 sq ft • Infinity Pool',
     listingUrl: 'https://www.airbnb.com/rooms/singapore-marina-bay-sky-12',
@@ -102,7 +102,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     title: 'Tokyo Roppongi Hills Penthouse',
     location: 'Roppongi, Tokyo, Japan',
     price: '3.90 GEN / month',
-    deposit: '3900',
+    deposit: '3.9',
     image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80',
     specs: '3 Bed • 3,800 sq ft • Private Onsen & City View',
     listingUrl: 'https://www.airbnb.com/rooms/tokyo-roppongi-hills-penthouse',
@@ -202,7 +202,7 @@ function App() {
     setEscrowId('DUBAI-ROYAL-01')
     setLandlord('0x71C8A4E2909743e2Ab9f34b7F6B169de00000001')
     setTenant(walletConnected ? walletAddress : '0x3B41C52E58C2AaF5F1f4438Bc1B20D45B3f8a421')
-    setAmount('5000')
+    setAmount('5')
     addLog('Pre-filled Royal Burj Dubai Penthouse lease parameters.')
   }
 
