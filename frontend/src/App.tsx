@@ -436,30 +436,33 @@ function App() {
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus... (this may take 30-60 seconds)')
       addLog(`[Chain] Transaction sent: ${txHash}. Waiting for AI consensus...`)
       await client.waitForTransactionReceipt({ hash: txHash })
+      addLog(`[Chain] AI consensus transaction confirmed on-chain!`)
       
-      // Read the REAL result from the on-chain contract after AI consensus
-      addLog(`[Chain] Reading finalized escrow state from contract...`)
-      const escrowDataRaw = await client.readContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'get_escrow',
-        args: [currentEscrow.escrowId]
-      })
-
-      let verdict = 'NORMAL_WEAR'
-      let reason = 'Resolved on-chain.'
+      // Read the REAL result using a read-only client (no MetaMask provider needed for view calls)
+      let verdict = 'RESOLVED'
+      let reason = 'Transaction confirmed on GenLayer. AI consensus reached.'
       let landlordPayout = '0'
       let tenantPayout = '0'
 
       try {
+        addLog(`[Chain] Reading finalized escrow state from contract...`)
+        const readClient = createClient({ chain: studionet, account: createAccount() })
+        const escrowDataRaw = await readClient.readContract({
+          address: contractAddress as `0x${string}`,
+          functionName: 'get_escrow',
+          args: [currentEscrow.escrowId]
+        })
+
         const escrowData = JSON.parse(escrowDataRaw as string)
-        verdict = escrowData.verdict || 'NORMAL_WEAR'
-        reason = escrowData.reason || 'No reasoning returned from AI consensus.'
+        verdict = escrowData.verdict || 'RESOLVED'
+        reason = escrowData.reason || 'AI consensus completed on-chain.'
         landlordPayout = escrowData.landlord_payout || '0'
         tenantPayout = escrowData.tenant_payout || '0'
         addLog(`[Chain] On-chain verdict: ${verdict}`)
-      } catch (parseErr) {
-        addLog(`[Warning] Could not parse on-chain result, using raw: ${String(escrowDataRaw)}`)
-        reason = String(escrowDataRaw)
+      } catch (readErr) {
+        addLog(`[Warning] Could not read final state from chain: ${String(readErr)}`)
+        addLog(`[Info] Transaction was confirmed. Verdict was written on-chain but frontend could not fetch it.`)
+        reason = 'AI consensus transaction confirmed on GenLayer. View result on GenLayer Explorer.'
       }
 
       const resolvedEscrow: EscrowState = {
