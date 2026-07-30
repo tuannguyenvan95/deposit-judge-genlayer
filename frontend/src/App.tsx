@@ -292,7 +292,7 @@ function App() {
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHashCreate, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHashCreate, status: 5 as any })
 
       // 2. Fund Escrow (Tenant)
       addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
@@ -302,7 +302,7 @@ function App() {
         args: [uniqueEscrowId],
         value: amountInWei
       })
-      await client.waitForTransactionReceipt({ hash: txHashFund, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHashFund, status: 5 as any })
 
       // 3. Read back on-chain state to confirm
       addLog(`[On-Chain] Verifying escrow state from contract...`)
@@ -374,7 +374,7 @@ function App() {
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHash, status: 5 as any })
 
       // Read back on-chain state to confirm evidence was stored
       addLog(`[On-Chain] Verifying evidence state from contract...`)
@@ -453,7 +453,7 @@ function App() {
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
+      await client.waitForTransactionReceipt({ hash: txHash, status: 5 as any })
       
       // Read actual on-chain result from the contract
       addLog(`[On-Chain] Reading escrow state from contract...`)
