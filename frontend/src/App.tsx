@@ -258,11 +258,18 @@ function App() {
     try {
       const client = getClient()
       
+      const amountInWei = (() => {
+        const parts = amount.split('.')
+        const whole = parts[0] || '0'
+        const fraction = (parts[1] || '').padEnd(18, '0').slice(0, 18)
+        return BigInt(whole + fraction)
+      })()
+
       // 1. Create Escrow Structure
       const txHashCreate = await client.writeContract({
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
-        args: [escrowId, landlord, tenant, BigInt(amount)],
+        args: [escrowId, landlord, tenant, amountInWei],
         value: 0n
       })
       await client.waitForTransactionReceipt({ hash: txHashCreate, status: 4 as any })
@@ -273,7 +280,7 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'fund_escrow_tenant',
         args: [escrowId],
-        value: BigInt(amount)
+        value: amountInWei
       })
       await client.waitForTransactionReceipt({ hash: txHashFund, status: 4 as any })
 
@@ -635,7 +642,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Security Deposit Amount (GEN / GEN)</label>
+                    <label>Security Deposit Amount (GEN)</label>
                     <input 
                       type="number" 
                       className="form-input" 
