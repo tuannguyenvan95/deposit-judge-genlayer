@@ -292,7 +292,7 @@ function App() {
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHashCreate, status: 5 as any })
+      await client.waitForTransactionReceipt({ hash: txHashCreate })
 
       // 2. Fund Escrow (Tenant)
       addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
@@ -302,21 +302,32 @@ function App() {
         args: [uniqueEscrowId],
         value: amountInWei
       })
-      await client.waitForTransactionReceipt({ hash: txHashFund, status: 5 as any })
+      await client.waitForTransactionReceipt({ hash: txHashFund })
 
-      // 3. Read back on-chain state to confirm
-      addLog(`[On-Chain] Verifying escrow state from contract...`)
-      const escrowDataRaw = await client.readContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'get_escrow',
-        args: [uniqueEscrowId]
-      })
+      // 3. Read back on-chain state to confirm (with polling)
+      addLog(`[On-Chain] Verifying escrow state from contract (waiting for nodes)...`)
+      let onChainData: any = null;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        try {
+          const escrowDataRaw = await client.readContract({
+            address: contractAddress as `0x${string}`,
+            functionName: 'get_escrow',
+            args: [uniqueEscrowId]
+          });
+          onChainData = JSON.parse(escrowDataRaw as string);
+          if (onChainData) {
+            addLog(`[Success] Verified on-chain data for ${uniqueEscrowId}`);
+            break;
+          }
+        } catch (e) {
+          addLog(`[Polling] Attempt ${attempt}/10: Data not yet available on node...`);
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
 
-      let onChainData: any = {}
-      try {
-        onChainData = JSON.parse(escrowDataRaw as string)
-      } catch (e) {
-        addLog(`[Warning] Could not parse on-chain verification: ${String(e)}`)
+      if (!onChainData) {
+        addLog(`[Warning] Could not verify on-chain state after 10 attempts. It may still be processing.`);
+        onChainData = {};
       }
 
       const newEscrow: EscrowState = {
@@ -374,21 +385,38 @@ function App() {
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
         value: 0n
       })
-      await client.waitForTransactionReceipt({ hash: txHash, status: 5 as any })
+      await client.waitForTransactionReceipt({ hash: txHash })
 
-      // Read back on-chain state to confirm evidence was stored
-      addLog(`[On-Chain] Verifying evidence state from contract...`)
-      const escrowDataRaw = await client.readContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'get_escrow',
-        args: [currentEscrow.escrowId]
-      })
+      // Read back on-chain state to confirm evidence was stored (with polling)
+      addLog(`[On-Chain] Verifying evidence state from contract (waiting for nodes)...`)
+      
+      let onChainData: any = null;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        try {
+          const escrowDataRaw = await client.readContract({
+            address: contractAddress as `0x${string}`,
+            functionName: 'get_escrow',
+            args: [currentEscrow.escrowId]
+          });
+          const parsed = JSON.parse(escrowDataRaw as string);
+          
+          // Verify that the evidence was actually stored in the returned state
+          if ((role === 'tenant' && parsed.tenant_evidence_submitted) || 
+              (role === 'landlord' && parsed.landlord_evidence_submitted)) {
+            onChainData = parsed;
+            addLog(`[Success] Verified on-chain evidence for ${role}`);
+            break;
+          }
+          throw new Error("Evidence not yet visible in state");
+        } catch (e) {
+          addLog(`[Polling] Attempt ${attempt}/10: Data not yet updated on node...`);
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
 
-      let onChainData: any = {}
-      try {
-        onChainData = JSON.parse(escrowDataRaw as string)
-      } catch (e) {
-        addLog(`[Warning] Could not parse on-chain data: ${String(e)}`)
+      if (!onChainData) {
+        addLog(`[Warning] Could not verify on-chain state after 10 attempts. It may still be processing.`);
+        onChainData = {};
       }
 
       const updated: EscrowState = {
@@ -453,29 +481,45 @@ function App() {
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      await client.waitForTransactionReceipt({ hash: txHash, status: 5 as any })
+      await client.waitForTransactionReceipt({ hash: txHash })
       
-      // Read actual on-chain result from the contract
-      addLog(`[On-Chain] Reading escrow state from contract...`)
-      const escrowDataRaw = await client.readContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'get_escrow',
-        args: [currentEscrow.escrowId]
-      })
+      // Read actual on-chain result from the contract (with polling)
+      addLog(`[On-Chain] Reading escrow state from contract (waiting for consensus)...`)
       
+      let onChainData: any = null;
+      for (let attempt = 1; attempt <= 15; attempt++) {
+        try {
+          const escrowDataRaw = await client.readContract({
+            address: contractAddress as `0x${string}`,
+            functionName: 'get_escrow',
+            args: [currentEscrow.escrowId]
+          });
+          const parsed = JSON.parse(escrowDataRaw as string);
+          
+          if (parsed && parsed.resolved) {
+            onChainData = parsed;
+            addLog(`[Success] Verified AI consensus on-chain!`);
+            break;
+          }
+          throw new Error("Escrow not yet resolved");
+        } catch (e) {
+          addLog(`[Polling] Attempt ${attempt}/15: AI consensus not yet reached on node...`);
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+
       let verdict = 'DISPUTE_ESCALATE'
       let reason = 'Unable to parse on-chain result.'
       let landlordPayout = '0'
       let tenantPayout = '0'
 
-      try {
-        const escrowData = JSON.parse(escrowDataRaw as string)
-        verdict = escrowData.verdict || 'DISPUTE_ESCALATE'
-        reason = escrowData.reason || 'No reasoning returned from AI consensus.'
-        landlordPayout = escrowData.landlord_payout || '0'
-        tenantPayout = escrowData.tenant_payout || '0'
-      } catch (parseErr) {
-        addLog(`[Warning] Could not parse on-chain escrow data: ${String(parseErr)}`)
+      if (onChainData) {
+        verdict = onChainData.verdict || 'DISPUTE_ESCALATE'
+        reason = onChainData.reason || 'No reasoning returned from AI consensus.'
+        landlordPayout = onChainData.landlord_payout || '0'
+        tenantPayout = onChainData.tenant_payout || '0'
+      } else {
+        addLog(`[Warning] Could not get resolved state after 15 attempts. Network might be slow.`)
       }
 
       const resolvedEscrow: EscrowState = {
