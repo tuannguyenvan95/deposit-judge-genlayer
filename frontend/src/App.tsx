@@ -51,7 +51,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
     specs: '6 Bed • 8,500 sq ft • Private Helipad',
     listingUrl: 'https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026',
-    landlordAddress: '0x71C...49f (Emirates Realty Vault)'
+    landlordAddress: '0x71C8A4E2909743e2Ab9f34b7F6B169de00000001'
   },
   {
     id: 'NYC-TRIBECA-88',
@@ -272,6 +272,14 @@ function App() {
       alert('Please fill in all mandatory parameters.')
       return
     }
+    if (!landlord.match(/^0x[a-fA-F0-9]{40}$/)) {
+      alert('Landlord address must be a valid 42-character Web3 hex address (e.g., 0x123...abc). Remove any extra text or names.')
+      return
+    }
+    if (!tenant.match(/^0x[a-fA-F0-9]{40}$/)) {
+      alert('Tenant address must be a valid 42-character Web3 hex address (e.g., 0x123...abc). Remove any extra text or names.')
+      return
+    }
     setLoading('creating')
     addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
     try {
@@ -326,10 +334,9 @@ function App() {
             addLog(`[Success] Verified on-chain data for ${uniqueEscrowId}`);
             break;
           }
-        } catch (e) {
-          // ignore error and retry
+        } catch (e: any) {
+          addLog(`[Polling] Attempt ${attempt}/15: Failed to read state - ${e.message}`);
         }
-        addLog(`[Polling] Attempt ${attempt}/15: Data not yet updated on node...`);
         await new Promise(r => setTimeout(r, 2000));
       }
 
