@@ -42,7 +42,7 @@ class DepositJudge(gl.Contract):
             landlord=landlord,
             tenant=tenant,
             deposit_amount=amount,
-            landlord_funded=False,
+            landlord_funded=True,
             tenant_funded=False,
             tenant_evidence_submitted=False,
             tenant_listing_url="",
@@ -62,18 +62,18 @@ class DepositJudge(gl.Contract):
 
     @gl.public.write
     def fund_escrow_landlord(self, escrow_id: str) -> bool:
-        escrow = self.escrows.get(escrow_id)
-        if escrow is None:
-            raise Exception("Escrow not found")
-        escrow.landlord_funded = True
-        self.escrows[escrow_id] = escrow
-        return True
+        pass # Landlord does not need to fund in this model
 
-    @gl.public.write
+    @gl.public.write.payable
     def fund_escrow_tenant(self, escrow_id: str) -> bool:
         escrow = self.escrows.get(escrow_id)
         if escrow is None:
             raise Exception("Escrow not found")
+        if escrow.tenant_funded:
+            raise Exception("Tenant already funded")
+        if gl.message.value < escrow.deposit_amount:
+            raise Exception("Insufficient funds sent for deposit")
+            
         escrow.tenant_funded = True
         self.escrows[escrow_id] = escrow
         return True
@@ -177,20 +177,26 @@ class DepositJudge(gl.Contract):
             damage_pct = 100
             
         if verdict_str == "NORMAL_WEAR":
-            escrow.landlord_payout = escrow.deposit_amount
+            escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = escrow.deposit_amount
         elif verdict_str == "DAMAGE":
             penalty = (escrow.deposit_amount * bigint(damage_pct)) // bigint(100)
-            escrow.landlord_payout = escrow.deposit_amount + penalty
+            escrow.landlord_payout = penalty
             escrow.tenant_payout = escrow.deposit_amount - penalty
         else:
+            # DISPUTE_ESCALATE: return funds to tenant or hold? Let's refund tenant for now
             escrow.landlord_payout = bigint(0)
-            escrow.tenant_payout = bigint(0)
+            escrow.tenant_payout = escrow.deposit_amount
 
         escrow.verdict = verdict_str
         escrow.reason = reason_str
         escrow.resolved = True
         self.escrows[escrow_id] = escrow
+        
+        if escrow.landlord_payout > 0:
+            emit_transfer(escrow.landlord, escrow.landlord_payout)
+        if escrow.tenant_payout > 0:
+            emit_transfer(escrow.tenant, escrow.tenant_payout)
         
         return verdict_str
 

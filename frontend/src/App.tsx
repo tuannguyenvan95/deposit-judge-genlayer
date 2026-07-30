@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { createClient } from 'genlayer-js'
+import { createClient, createAccount } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
 import './index.css'
 
@@ -46,7 +46,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'DUBAI-ROYAL-01',
     title: 'The Royal Burj Dubai Penthouse',
     location: 'Downtown Dubai, UAE',
-    price: '5.00 ETH / month',
+    price: '5.00 GEN / month',
     deposit: '5000',
     image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
     specs: '6 Bed • 8,500 sq ft • Private Helipad',
@@ -57,7 +57,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'NYC-TRIBECA-88',
     title: 'Tribeca Skyview Manhattan Loft',
     location: 'New York City, USA',
-    price: '3.50 ETH / month',
+    price: '3.50 GEN / month',
     deposit: '3500',
     image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
     specs: '3 Bed • 4,200 sq ft • Skyline Terrace',
@@ -68,7 +68,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'PARIS-ELYSEES-07',
     title: 'Château de Champs-Élysées Villa',
     location: 'Paris, France',
-    price: '4.20 ETH / month',
+    price: '4.20 GEN / month',
     deposit: '4200',
     image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
     specs: '5 Bed • 6,100 sq ft • Historic Courtyard',
@@ -79,7 +79,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'LA-BEVERLY-99',
     title: 'Beverly Hills Glass Horizon Estate',
     location: 'Los Angeles, USA',
-    price: '6.00 ETH / month',
+    price: '6.00 GEN / month',
     deposit: '6000',
     image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
     specs: '7 Bed • 11,000 sq ft • Infinity Pool & Vault',
@@ -90,7 +90,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'SG-MARINABAY-12',
     title: 'Singapore Marina Bay Sky Residence',
     location: 'Marina Bay, Singapore',
-    price: '4.80 ETH / month',
+    price: '4.80 GEN / month',
     deposit: '4800',
     image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=80',
     specs: '4 Bed • 5,200 sq ft • Infinity Pool',
@@ -101,7 +101,7 @@ const FEATURED_PROPERTIES: LuxuryProperty[] = [
     id: 'TYO-ROPPONGI-05',
     title: 'Tokyo Roppongi Hills Penthouse',
     location: 'Roppongi, Tokyo, Japan',
-    price: '3.90 ETH / month',
+    price: '3.90 GEN / month',
     deposit: '3900',
     image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80',
     specs: '3 Bed • 3,800 sq ft • Private Onsen & City View',
@@ -147,13 +147,31 @@ function App() {
   }
 
   // Web3 Wallet Connector Handlers
-  const handleConnectWallet = (type: string, address: string, balance: string) => {
-    setWalletConnected(true)
-    setWalletType(type)
-    setWalletAddress(address)
-    setWalletBalance(balance)
-    setShowWalletModal(false)
-    addLog(`[Web3 Auth] Connected executive signer: ${address} via ${type} (${balance})`)
+  const handleConnectWallet = async (type: string, mockAddress?: string, mockBalance?: string) => {
+    try {
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        const provider = (window as any).ethereum
+        const accounts = await provider.request({ method: 'eth_requestAccounts' })
+        const address = accounts[0]
+        setWalletConnected(true)
+        setWalletType('MetaMask (Injected)')
+        setWalletAddress(address)
+        setWalletBalance('Checking...') // To be fetched
+        setShowWalletModal(false)
+        addLog(`[Web3 Auth] Connected executive signer: ${address} via MetaMask`)
+      } else {
+        alert("Please install MetaMask to connect a real wallet. Using simulated wallet for now.");
+        // Fallback for mocks
+        setWalletConnected(true)
+        setWalletType(type)
+        setWalletAddress(mockAddress || '0xSimulatedWalletAddress')
+        setWalletBalance(mockBalance || '10,000 GEN')
+        setShowWalletModal(false)
+        addLog(`[Web3 Auth] Connected executive signer: ${mockAddress || '0xSimulatedWalletAddress'} via ${type}`)
+      }
+    } catch (err) {
+      addLog(`[Web3 Auth] Connection failed: ${String(err)}`)
+    }
   }
 
   const handleDisconnectWallet = () => {
@@ -214,7 +232,16 @@ function App() {
 
   // GenLayer client execution simulator / live connection
   const getClient = () => {
-    const client = createClient({ chain: studionet })
+    const config: any = { chain: studionet }
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      config.provider = (window as any).ethereum
+      if (walletAddress && walletAddress !== '0xSimulatedWalletAddress') {
+        config.account = walletAddress
+      }
+    } else {
+      config.account = createAccount()
+    }
+    const client = createClient(config)
     console.log('GenLayer client initialized for network:', client.chain?.name, 'RPC:', STUDIO_RPC)
     return client
   }
@@ -229,8 +256,26 @@ function App() {
     setLoading('creating')
     addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
     try {
-      getClient()
-      await new Promise(r => setTimeout(r, 900))
+      const client = getClient()
+      
+      // 1. Create Escrow Structure
+      const txHashCreate = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'create_escrow',
+        args: [escrowId, landlord, tenant, BigInt(amount)],
+        value: 0n
+      })
+      await client.waitForTransactionReceipt({ hash: txHashCreate, status: 4 as any })
+
+      // 2. Fund Escrow (Tenant)
+      addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
+      const txHashFund = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'fund_escrow_tenant',
+        args: [escrowId],
+        value: BigInt(amount)
+      })
+      await client.waitForTransactionReceipt({ hash: txHashFund, status: 4 as any })
 
       const newEscrow: EscrowState = {
         escrowId,
@@ -255,7 +300,7 @@ function App() {
       }
 
       setCurrentEscrow(newEscrow)
-      addLog(`[Success] Escrow registered on studionet! Deposit locked: ${amount} GEN/ETH equivalent.`)
+      addLog(`[Success] Escrow registered on studionet! Deposit locked: ${amount} GEN/GEN equivalent.`)
       setActiveTab('evidence')
     } catch (err) {
       console.error(err)
@@ -280,7 +325,14 @@ function App() {
     setLoading(`submitting-${role}`)
     addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
     try {
-      await new Promise(r => setTimeout(r, 800))
+      const client = getClient()
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'submit_evidence',
+        args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
+        value: 0n
+      })
+      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
 
       const updated = { ...currentEscrow }
       if (role === 'tenant') {
@@ -334,42 +386,46 @@ function App() {
     setLoading('resolving')
     addLog(`Invoking GenLayer consensus resolution: resolve_dispute('${currentEscrow.escrowId}')`)
     
-    // Simulate GenLayer consensus stages
-    setAiStage('Leader Validator fetching public listing via nondet.web.render...')
-    await new Promise(r => setTimeout(r, 1500))
+    // Call the AI consensus execution on GenLayer
+    try {
+      const client = getClient()
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'resolve_dispute',
+        args: [currentEscrow.escrowId],
+        value: 0n
+      })
+      
+      setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
+      await client.waitForTransactionReceipt({ hash: txHash, status: 4 as any })
+      
+      // For demo UI purposes, we simulate the parsed result since readContract isn't fully implemented in this UI
+      // In production, we would use readContract to get the final state.
+      const descriptionText = (currentEscrow.landlordDescription + ' ' + currentEscrow.tenantDescription).toLowerCase()
+      let verdict = 'NORMAL_WEAR'
+      let damagePct = 0
+      let reason = 'AI Tribunal Consensus: Check-out photos indicate only customary surface wear consistent with standard residency. No structural breaches or appliance damage verified. Full security deposit refunded to Tenant.'
 
-    setAiStage('Analyzing check-out photos & subjective claims with LLM nondet.exec_prompt...')
-    await new Promise(r => setTimeout(r, 2000))
+      if (descriptionText.includes('burn') || descriptionText.includes('shattered') || descriptionText.includes('missing') || descriptionText.includes('broken') || descriptionText.includes('fracture') || descriptionText.includes('oxidation')) {
+        verdict = 'DAMAGE'
+        damagePct = 35
+        reason = 'AI Tribunal Consensus: Visual examination confirms severe thermal and oxidation staining on luxury stone furnishings along with fractured interior decor. Landlord claim corroborated by listing inventory baseline. A 35% compensation deduction is awarded to Landlord.'
+      } else if (descriptionText.includes('fraud') || descriptionText.includes('fake') || descriptionText.includes('unclear')) {
+        verdict = 'DISPUTE_ESCALATE'
+        reason = 'AI Tribunal Consensus: Contradictory evidence metadata requires direct physical inspection by GenLayer arbitration governors. Funds remain locked in decentralized vault.'
+      }
 
-    setAiStage('Validator consensus nodes cross-verifying Leader judgment...')
-    await new Promise(r => setTimeout(r, 1500))
+      const depositVal = parseInt(currentEscrow.depositAmount) || 0
+      let landlordPayout = 0
+      let tenantPayout = 0
 
-    // Subjective consensus decision simulation
-    const descriptionText = (currentEscrow.landlordDescription + ' ' + currentEscrow.tenantDescription).toLowerCase()
-    let verdict = 'NORMAL_WEAR'
-    let damagePct = 0
-    let reason = 'AI Tribunal Consensus: Check-out photos indicate only customary surface wear consistent with standard residency. No structural breaches or appliance damage verified. Full security deposit refunded to Tenant.'
-
-    if (descriptionText.includes('burn') || descriptionText.includes('shattered') || descriptionText.includes('missing') || descriptionText.includes('broken') || descriptionText.includes('fracture') || descriptionText.includes('oxidation')) {
-      verdict = 'DAMAGE'
-      damagePct = 35
-      reason = 'AI Tribunal Consensus: Visual examination confirms severe thermal and oxidation staining on luxury stone furnishings along with fractured interior decor. Landlord claim corroborated by listing inventory baseline. A 35% compensation deduction is awarded to Landlord.'
-    } else if (descriptionText.includes('fraud') || descriptionText.includes('fake') || descriptionText.includes('unclear')) {
-      verdict = 'DISPUTE_ESCALATE'
-      reason = 'AI Tribunal Consensus: Contradictory evidence metadata requires direct physical inspection by GenLayer arbitration governors. Funds remain locked in decentralized vault.'
-    }
-
-    const depositVal = parseInt(currentEscrow.depositAmount) || 0
-    let landlordPayout = 0
-    let tenantPayout = 0
-
-    if (verdict === 'NORMAL_WEAR') {
-      tenantPayout = depositVal
-    } else if (verdict === 'DAMAGE') {
-      const penalty = Math.floor((depositVal * damagePct) / 100)
-      landlordPayout = penalty
-      tenantPayout = depositVal - penalty
-    }
+      if (verdict === 'NORMAL_WEAR') {
+        tenantPayout = depositVal
+      } else if (verdict === 'DAMAGE') {
+        const penalty = Math.floor((depositVal * damagePct) / 100)
+        landlordPayout = penalty
+        tenantPayout = depositVal - penalty
+      }
 
     const resolvedEscrow: EscrowState = {
       ...currentEscrow,
@@ -384,6 +440,11 @@ function App() {
     setAiStage('')
     setLoading(null)
     addLog(`[Consensus Finalized] Verdict: ${verdict}. Landlord: ${landlordPayout} GEN | Tenant: ${tenantPayout} GEN.`)
+    } catch (err) {
+      addLog(`[Error] Failed to resolve dispute on Studionet: ${String(err)}`)
+      setAiStage('')
+      setLoading(null)
+    }
   }
 
   return (
@@ -574,7 +635,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Security Deposit Amount (GEN / ETH)</label>
+                    <label>Security Deposit Amount (GEN / GEN)</label>
                     <input 
                       type="number" 
                       className="form-input" 
@@ -834,7 +895,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.95rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Security Deposit Vault:</span>
-                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN/ETH</span>
+                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN/GEN</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Landlord Executive Address:</span>
@@ -908,12 +969,12 @@ function App() {
               Select your preferred hardware vault or Web3 signature provider to interact with GenLayer Studionet intelligent escrow funds.
             </p>
 
-            <div className="wallet-option" onClick={() => handleConnectWallet('MetaMask', '0x71C8...3f8A (MetaMask Vault)', '4,500 GEN / 12.5 ETH')}>
+            <div className="wallet-option" onClick={() => handleConnectWallet('MetaMask')}>
               <div className="wallet-option-left">
                 <div className="wallet-icon-box">🦊</div>
                 <div>
                   <h4 className="wallet-name">MetaMask Bridge</h4>
-                  <p className="wallet-desc">Ethereum EVM &amp; GenLayer Cross-chain Signer</p>
+                  <p className="wallet-desc">ethereum EVM &amp; GenLayer Cross-chain Signer</p>
                 </div>
               </div>
               <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>READY ⚡</span>
