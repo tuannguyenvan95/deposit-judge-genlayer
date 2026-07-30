@@ -298,7 +298,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
       if ((receiptCreate as any).status === 7) {
@@ -311,7 +315,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'fund_escrow_tenant',
         args: [uniqueEscrowId],
-        value: amountInWei
+        value: amountInWei,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
       if ((receiptFund as any).status === 7) {
@@ -397,7 +405,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'submit_evidence',
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receipt = await client.waitForTransactionReceipt({ hash: txHash })
       if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
