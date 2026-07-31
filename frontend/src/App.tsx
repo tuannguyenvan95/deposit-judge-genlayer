@@ -315,9 +315,9 @@ function App() {
       const client = getClient()
       
       const amountInWei = (() => {
-        const parts = amount.split('.')
+        const parts = amount.replace(',', '.').split('.')
         const whole = parts[0] || '0'
-        const fraction = (parts[1] || '').padEnd(15, '0').slice(0, 15)
+        const fraction = (parts[1] || '').padEnd(18, '0').slice(0, 18)
         return BigInt(whole + fraction)
       })()
 
