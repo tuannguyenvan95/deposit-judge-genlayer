@@ -305,7 +305,7 @@ function App() {
         maxPriorityFeePerGas: 500000000n
       })
       const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
-      if ((receiptCreate as any).status === 7) {
+      if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || (receiptCreate as any).status === 'REVERTED') {
          throw new Error("create_escrow reverted on-chain (Status: ERROR)");
       }
 
@@ -322,7 +322,7 @@ function App() {
         maxPriorityFeePerGas: 500000000n
       })
       const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
-      if ((receiptFund as any).status === 7) {
+      if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || (receiptFund as any).status === 'REVERTED') {
          throw new Error("fund_escrow_tenant reverted on-chain (Status: ERROR)");
       }
 
