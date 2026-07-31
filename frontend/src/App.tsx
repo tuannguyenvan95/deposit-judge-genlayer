@@ -326,7 +326,7 @@ function App() {
       const txHashCreate = await client.writeContract({
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
-        args: [uniqueEscrowId, landlord, tenant, amountInWei],
+        args: [uniqueEscrowId, landlord.toLowerCase(), tenant.toLowerCase(), amountInWei],
         value: 0n,
         // @ts-ignore
         maxFeePerGas: 500000000n,
@@ -334,8 +334,8 @@ function App() {
         maxPriorityFeePerGas: 500000000n
       })
       const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
-      if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || (receiptCreate as any).status === 'REVERTED') {
-         throw new Error("create_escrow reverted on-chain (Status: ERROR)");
+      if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || String((receiptCreate as any).status).toUpperCase() === 'REVERTED') {
+         throw new Error(`create_escrow reverted on-chain. TX: ${txHashCreate}`);
       }
 
       // 2. Fund Escrow (Tenant)
@@ -351,8 +351,8 @@ function App() {
         maxPriorityFeePerGas: 500000000n
       })
       const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
-      if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || (receiptFund as any).status === 'REVERTED') {
-         throw new Error("fund_escrow_tenant reverted on-chain (Status: ERROR)");
+      if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || String((receiptFund as any).status).toUpperCase() === 'REVERTED') {
+         throw new Error(`fund_escrow_tenant reverted on-chain. TX: ${txHashFund}`);
       }
 
       // 3. Read back on-chain state to confirm (with polling)
