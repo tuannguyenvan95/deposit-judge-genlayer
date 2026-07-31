@@ -505,7 +505,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'resolve_dispute',
         args: [currentEscrow.escrowId],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
