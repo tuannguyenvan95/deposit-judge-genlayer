@@ -298,11 +298,7 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
+        value: 0n
       })
       const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
       if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || (receiptCreate as any).status === 'REVERTED') {
@@ -315,11 +311,7 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'fund_escrow_tenant',
         args: [uniqueEscrowId],
-        value: amountInWei,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
+        value: amountInWei
       })
       const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
       if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || (receiptFund as any).status === 'REVERTED') {
@@ -405,11 +397,7 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'submit_evidence',
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
+        value: 0n
       })
       const receipt = await client.waitForTransactionReceipt({ hash: txHash })
       if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
@@ -505,11 +493,7 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'resolve_dispute',
         args: [currentEscrow.escrowId],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
+        value: 0n
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
