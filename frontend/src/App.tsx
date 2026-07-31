@@ -165,6 +165,35 @@ function App() {
     setLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 15)])
   }
 
+  // --- PATCH FOR GENLAYER GAS PRICE BUG ---
+  // The genlayer-js SDK fetches eth_gasPrice directly from the RPC node.
+  // Since GenLayer Studionet returns 0x0, the SDK passes gasPrice: 0 to MetaMask,
+  // which causes the "feeCap 0 below chain minimum" error.
+  // We intercept the fetch call to mock a 5 Gwei gas price.
+  useEffect(() => {
+    if (!(window as any)._patchedFetch) {
+      const originalFetch = window.fetch;
+      window.fetch = async (...args) => {
+        const url = args[0] as string;
+        if (url && typeof url === 'string' && url.includes('studio.genlayer.com/rpc')) {
+          const init = args[1] as RequestInit;
+          if (init && init.body && typeof init.body === 'string' && init.body.includes('"eth_gasPrice"')) {
+            return new Response(JSON.stringify({
+              jsonrpc: "2.0",
+              id: JSON.parse(init.body).id || 1,
+              result: "0x12a05f200" // 5 Gwei
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        return originalFetch(...args);
+      };
+      (window as any)._patchedFetch = true;
+    }
+  }, [])
+
   // Web3 Wallet Connector Handlers
   const handleConnectWallet = async (type: string, mockAddress?: string, mockBalance?: string) => {
     try {
@@ -298,7 +327,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
         args: [uniqueEscrowId, landlord, tenant, amountInWei],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
       if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || (receiptCreate as any).status === 'REVERTED') {
@@ -311,7 +344,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'fund_escrow_tenant',
         args: [uniqueEscrowId],
-        value: amountInWei
+        value: amountInWei,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
       if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || (receiptFund as any).status === 'REVERTED') {
@@ -397,7 +434,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'submit_evidence',
         args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       const receipt = await client.waitForTransactionReceipt({ hash: txHash })
       if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
@@ -493,7 +534,11 @@ function App() {
         address: contractAddress as `0x${string}`,
         functionName: 'resolve_dispute',
         args: [currentEscrow.escrowId],
-        value: 0n
+        value: 0n,
+        // @ts-ignore
+        maxFeePerGas: 500000000n,
+        // @ts-ignore
+        maxPriorityFeePerGas: 500000000n
       })
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
