@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient, createAccount } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
+import { getAddress } from 'viem'
 import './index.css'
 
 // Configuration for GenLayer Studio Network (studionet)
@@ -326,7 +327,7 @@ function App() {
       const txHashCreate = await client.writeContract({
         address: contractAddress as `0x${string}`,
         functionName: 'create_escrow',
-        args: [uniqueEscrowId, landlord.toLowerCase(), tenant.toLowerCase(), amountInWei],
+        args: [uniqueEscrowId, getAddress(landlord), getAddress(tenant), amountInWei],
         value: 0n,
         // @ts-ignore
         maxFeePerGas: 500000000n,
