@@ -6,7 +6,7 @@ import './index.css'
 
 // Configuration for GenLayer Studio Network (studionet)
 const STUDIO_RPC = 'https://studio.genlayer.com/rpc' 
-const DEFAULT_CONTRACT_ADDRESS = '0x57aE0D2624bC0cb7184232BaC19C719E439F3C27'
+const DEFAULT_CONTRACT_ADDRESS = '0x839828eC875dC7c1EDFEb1CF5b595bBCae4911dD'
 
 const formatGen = (val: string | number | undefined | null): string => {
   if (!val || val === '0' || val === 0) return '0';
