@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { createClient, createAccount } from 'genlayer-js'
+import { createClient } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
 import { getAddress } from 'viem'
 import './index.css'
@@ -22,17 +22,6 @@ const formatGen = (val: string | number | undefined | null): string => {
     return s;
   }
 };
-
-// Persistent session account for simulated/non-MetaMask testing so caller address stays authenticated across transactions
-const getSessionAccount = () => {
-  if (typeof window !== 'undefined') {
-    if (!(window as any)._genlayer_session_account) {
-      (window as any)._genlayer_session_account = createAccount()
-    }
-    return (window as any)._genlayer_session_account
-  }
-  return createAccount()
-}
 
 interface EscrowState {
   escrowId: string;
@@ -151,7 +140,7 @@ function App() {
   // Form State for Escrow Creation
   const [escrowId, setEscrowId] = useState('NYC-TRIBECA-88')
   const [landlord, setLandlord] = useState('0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7')
-  const [tenant, setTenant] = useState(getSessionAccount().address)
+  const [tenant, setTenant] = useState('')
   const [amount, setAmount] = useState('3500')
 
   // Form State for Evidence Submission
@@ -221,8 +210,8 @@ function App() {
     }
   }, [])
 
-  // Web3 Wallet Connector Handlers
-  const handleConnectWallet = async (type: string, _mockAddress?: string, mockBalance?: string) => {
+  // Web3 Wallet Connector Handlers - 100% Real On-Chain Execution Only
+  const handleConnectWallet = async (type: string) => {
     try {
       if (typeof window !== 'undefined' && (window as any).ethereum) {
         const provider = (window as any).ethereum
@@ -231,19 +220,12 @@ function App() {
         setWalletConnected(true)
         setWalletType('MetaMask (Injected)')
         setWalletAddress(address)
-        setWalletBalance('Checking...') // To be fetched
+        setTenant(address)
+        setWalletBalance('Active On-Chain')
         setShowWalletModal(false)
-        addLog(`[Web3 Auth] Connected executive signer: ${address} via MetaMask`)
+        addLog(`[Web3 Auth] Connected real on-chain signer: ${address} via ${type}`)
       } else {
-        alert("Please install MetaMask to connect a real wallet. Using simulated wallet for now.");
-        const sessionAddr = getSessionAccount().address
-        setWalletConnected(true)
-        setWalletType(type)
-        setWalletAddress(sessionAddr)
-        setTenant(sessionAddr)
-        setWalletBalance(mockBalance || '10,000 GEN')
-        setShowWalletModal(false)
-        addLog(`[Web3 Auth] Connected GenLayer Studio session signer: ${sessionAddr} via ${type}`)
+        alert("Web3 Provider not found! Please install MetaMask or a compatible Ethereum wallet extension to interact with GenLayer StudioNet directly.");
       }
     } catch (err) {
       addLog(`[Web3 Auth] Connection failed: ${String(err)}`)
@@ -254,6 +236,7 @@ function App() {
     addLog(`[Web3 Auth] Disconnected executive signer ${walletAddress} (${walletType})`)
     setWalletConnected(false)
     setWalletAddress('')
+    setTenant('')
     setWalletType('')
     setWalletBalance('')
   }
@@ -266,7 +249,7 @@ function App() {
     if (walletConnected && walletAddress) {
       setTenant(walletAddress)
     } else {
-      setTenant(getSessionAccount().address)
+      setTenant('')
     }
     setActiveTab('create')
     addLog(`[Lease Selected] Loaded luxury specifications for: ${property.title} (${property.location})`)
@@ -274,14 +257,12 @@ function App() {
   }
 
 
-  // GenLayer client execution simulator / live connection
+  // GenLayer live client connection
   const getClient = () => {
     const config: any = { chain: studionet }
-    if (typeof window !== 'undefined' && (window as any).ethereum && walletConnected && walletAddress && walletType.includes('MetaMask')) {
+    if (typeof window !== 'undefined' && (window as any).ethereum && walletConnected && walletAddress) {
       config.provider = (window as any).ethereum
       config.account = walletAddress
-    } else {
-      config.account = getSessionAccount()
     }
     const client = createClient(config)
     console.log('GenLayer client initialized for network:', client.chain?.name, 'RPC:', STUDIO_RPC)
@@ -317,9 +298,13 @@ function App() {
     }
   };
 
-  // 1. Create & Register Escrow
+  // 1. Create & Register Escrow (Real On-Chain Only)
   const handleCreateEscrow = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!walletConnected || !walletAddress) {
+      alert('Please connect your real Web3 wallet (MetaMask) first to perform on-chain transactions on GenLayer StudioNet!');
+      return
+    }
     if (!escrowId || !landlord || !tenant || !amount) {
       alert('Please fill in all mandatory parameters.')
       return
@@ -423,9 +408,13 @@ function App() {
     }
   }
 
-  // 2. Submit Evidence
+  // 2. Submit Evidence (Real On-Chain Only)
   const handleSubmitEvidence = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!walletConnected || !walletAddress) {
+      alert('Please connect your real Web3 wallet (MetaMask) first to perform on-chain transactions on GenLayer StudioNet!');
+      return
+    }
     if (!currentEscrow) {
       alert('No active escrow registered in tracking console!')
       return
@@ -512,23 +501,34 @@ function App() {
     }
   }
 
-  // 2.5 Handle IPFS Upload Simulation
+  // 2.5 Handle Real File Evidence Load
   const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
     setUploadingIpfs(true)
-    addLog(`[IPFS] Encrypting & Pinning ${file.name} to decentralized storage...`)
+    addLog(`[Evidence Loader] Reading local evidence file ${file.name}...`)
     
-    setTimeout(() => {
-      const mockCid = 'Qm' + Array.from({length: 44}, () => Math.floor(Math.random()*36).toString(36)).join('')
-      setEvidenceUrl(`ipfs://${mockCid}`)
-      setUploadingIpfs(false)
-      addLog(`[IPFS] Successfully pinned. CID: ${mockCid}`)
-    }, 1800)
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result) {
+        setEvidenceUrl(reader.result.toString());
+        setUploadingIpfs(false);
+        addLog(`[Evidence Loader] File successfully processed and prepared for immutable submission.`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Failed to read evidence file.');
+      setUploadingIpfs(false);
+    };
+    reader.readAsDataURL(file);
   }
 
-  // 3. Trigger AI Consensus Resolution
+  // 3. Trigger AI Consensus Resolution (Real On-Chain Only)
   const handleResolveDispute = async () => {
+    if (!walletConnected || !walletAddress) {
+      alert('Please connect your real Web3 wallet (MetaMask) first to perform on-chain transactions on GenLayer StudioNet!');
+      return
+    }
     if (!currentEscrow) return
     if (!currentEscrow.tenantSubmitted && !currentEscrow.landlordSubmitted) {
       alert('Please submit at least one check-out evidence record before convening the AI Tribunal.')
@@ -1130,55 +1130,11 @@ function App() {
               <div className="wallet-option-left">
                 <div className="wallet-icon-box">🦊</div>
                 <div>
-                  <h4 className="wallet-name">MetaMask Bridge</h4>
-                  <p className="wallet-desc">ethereum EVM &amp; GenLayer Cross-chain Signer</p>
+                  <h4 className="wallet-name">MetaMask / Injected Web3 Wallet</h4>
+                  <p className="wallet-desc">Real On-Chain GenLayer Studionet Signer</p>
                 </div>
               </div>
-              <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>READY ⚡</span>
-            </div>
-
-            <div className="wallet-option" onClick={() => handleConnectWallet('Coinbase Wallet', '0x2F4E...1C4E (Coinbase Executive)', '8,200 GEN')}>
-              <div className="wallet-option-left">
-                <div className="wallet-icon-box">🛡️</div>
-                <div>
-                  <h4 className="wallet-name">Coinbase Wallet</h4>
-                  <p className="wallet-desc">Institutional Custody &amp; Security Vault</p>
-                </div>
-              </div>
-              <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>VAULT READY</span>
-            </div>
-
-            <div className="wallet-option" onClick={() => handleConnectWallet('WalletConnect', '0x9B1c...8D2a (Mobile Session)', '1,250 GEN')}>
-              <div className="wallet-option-left">
-                <div className="wallet-icon-box">🌐</div>
-                <div>
-                  <h4 className="wallet-name">WalletConnect Protocol</h4>
-                  <p className="wallet-desc">Multi-chain QR Mobile Authenticator</p>
-                </div>
-              </div>
-              <span style={{ color: 'var(--gold-light)', fontWeight: '700', fontSize: '0.85rem' }}>SCAN QR</span>
-            </div>
-
-            <div className="wallet-option" onClick={() => handleConnectWallet('GenLayer Landlord Key', '0x8920...43e7 (Studio Landlord)', '15,000 GEN')}>
-              <div className="wallet-option-left">
-                <div className="wallet-icon-box">👑</div>
-                <div>
-                  <h4 className="wallet-name">GenLayer Studio Key (Landlord)</h4>
-                  <p className="wallet-desc">Native Studionet Lessor Authority Key</p>
-                </div>
-              </div>
-              <span style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '0.85rem' }}>NATIVE KEY</span>
-            </div>
-
-            <div className="wallet-option" onClick={() => handleConnectWallet('GenLayer Tenant Key', '0x3B41...a421 (Studio Tenant)', '3,500 GEN')}>
-              <div className="wallet-option-left">
-                <div className="wallet-icon-box">👤</div>
-                <div>
-                  <h4 className="wallet-name">GenLayer Studio Key (Tenant)</h4>
-                  <p className="wallet-desc">Native Studionet Lessee Authority Key</p>
-                </div>
-              </div>
-              <span style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '0.85rem' }}>NATIVE KEY</span>
+              <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>CONNECT REAL WALLET ⚡</span>
             </div>
 
             {walletConnected && (
