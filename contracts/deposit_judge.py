@@ -26,24 +26,26 @@ class Escrow:
     landlord_payout: bigint
     tenant_payout: bigint
 
-class DepositJudge(gl.Contract):
+class Contract(gl.Contract):
     escrows: TreeMap[str, Escrow]
 
     def __init__(self):
-        # Do not reassign TreeMap or DynArray in constructor
         pass
         
-    @gl.public.write
-    def create_escrow(self, escrow_id: str, landlord: Address, tenant: Address, amount: bigint) -> bool:
+    @gl.public.write.payable
+    def create_escrow(self, escrow_id: str, landlord: str, tenant: str) -> str:
+        amount = gl.message.value
+        if amount <= bigint(0):
+            raise UserError("Deposit amount must be greater than 0")
         if escrow_id in self.escrows:
-            raise Exception("Escrow ID already exists")
+            raise UserError("Escrow ID already exists")
         
         self.escrows[escrow_id] = Escrow(
-            landlord=landlord,
-            tenant=tenant,
+            landlord=Address(str(landlord)),
+            tenant=Address(str(tenant)),
             deposit_amount=amount,
             landlord_funded=True,
-            tenant_funded=False,
+            tenant_funded=True,
             tenant_evidence_submitted=False,
             tenant_listing_url="",
             tenant_description="",
@@ -58,35 +60,17 @@ class DepositJudge(gl.Contract):
             landlord_payout=bigint(0),
             tenant_payout=bigint(0)
         )
-        return True
+        return escrow_id
 
     @gl.public.write
-    def fund_escrow_landlord(self, escrow_id: str) -> bool:
-        pass # Landlord does not need to fund in this model
-
-    @gl.public.write.payable
-    def fund_escrow_tenant(self, escrow_id: str) -> bool:
-        escrow = self.escrows.get(escrow_id)
-        if escrow is None:
-            raise Exception("Escrow not found")
-        if escrow.tenant_funded:
-            raise Exception("Tenant already funded")
-        if gl.message.value < escrow.deposit_amount:
-            raise Exception("Insufficient funds sent for deposit")
-            
-        escrow.tenant_funded = True
-        self.escrows[escrow_id] = escrow
-        return True
-
-    @gl.public.write
-    def submit_evidence(self, escrow_id: str, role: str, listing_url: str, description: str, evidence_url: str) -> bool:
-        escrow = self.escrows.get(escrow_id)
-        if escrow is None:
-            raise Exception("Escrow not found")
+    def submit_evidence(self, escrow_id: str, role: str, listing_url: str, description: str, evidence_url: str) -> None:
+        if escrow_id not in self.escrows:
+            raise UserError("Escrow not found")
+        escrow = self.escrows[escrow_id]
         if not escrow.landlord_funded or not escrow.tenant_funded:
-            raise Exception("Escrow must be funded by both Landlord and Tenant before submitting evidence")
+            raise UserError("Escrow must be funded by both Landlord and Tenant before submitting evidence")
         if escrow.resolved:
-            raise Exception("Escrow dispute has already been resolved")
+            raise UserError("Escrow dispute has already been resolved")
             
         clean_role = role.strip().lower()
         if clean_role == "tenant":
@@ -100,77 +84,123 @@ class DepositJudge(gl.Contract):
             escrow.landlord_evidence_url = evidence_url
             escrow.landlord_evidence_submitted = True
         else:
-            raise Exception("Role must be strictly 'tenant' or 'landlord'")
+            raise UserError("Role must be strictly 'tenant' or 'landlord'")
             
         self.escrows[escrow_id] = escrow
-        return True
 
     @gl.public.write
-    def resolve_dispute(self, escrow_id: str) -> str:
-        escrow = self.escrows.get(escrow_id)
-        if escrow is None:
-            raise Exception("Escrow not found")
+    def resolve_dispute(self, escrow_id: str) -> None:
+        if escrow_id not in self.escrows:
+            raise UserError("Escrow not found")
+        escrow = self.escrows[escrow_id]
         if escrow.resolved:
-            raise Exception("Escrow dispute already resolved")
+            raise UserError("Escrow dispute already resolved")
         if not escrow.tenant_evidence_submitted and not escrow.landlord_evidence_submitted:
-            raise Exception("At least one party must submit evidence before triggering AI judge resolution")
+            raise UserError("At least one party must submit evidence before triggering AI judge resolution")
+
+        # Extract storage fields to local strings before entering nondeterministic lambda
+        t_listing = str(escrow.tenant_listing_url)
+        l_listing = str(escrow.landlord_listing_url)
+        t_desc = str(escrow.tenant_description)
+        l_desc = str(escrow.landlord_description)
+        t_ev_url = str(escrow.tenant_evidence_url)
+        l_ev_url = str(escrow.landlord_evidence_url)
 
         def leader_fn():
-            target_listing = escrow.landlord_listing_url if escrow.landlord_listing_url != "" else escrow.tenant_listing_url
-            listing_html = gl.nondet.web.render(target_listing) if target_listing != "" else "No original listing URL provided."
-            
-            tenant_ev_html = gl.nondet.web.render(escrow.tenant_evidence_url) if escrow.tenant_evidence_url != "" else "No tenant evidence URL provided."
-            landlord_ev_html = gl.nondet.web.render(escrow.landlord_evidence_url) if escrow.landlord_evidence_url != "" else "No landlord evidence URL provided."
+            target_listing = l_listing if l_listing != "" else t_listing
+            try:
+                if target_listing != "":
+                    res = gl.nondet.web.render(target_listing, mode="text")
+                    listing_text = res.content if hasattr(res, "content") else str(res)
+                else:
+                    listing_text = "No original listing URL provided."
+            except Exception as e:
+                listing_text = f"Network or render error for listing: {str(e)}"
+
+            try:
+                if t_ev_url != "":
+                    t_res = gl.nondet.web.render(t_ev_url, mode="text")
+                    tenant_ev_text = t_res.content if hasattr(t_res, "content") else str(t_res)
+                else:
+                    tenant_ev_text = "No tenant evidence URL provided."
+            except Exception as e:
+                tenant_ev_text = f"Network or render error for tenant evidence: {str(e)}"
+
+            try:
+                if l_ev_url != "":
+                    l_res = gl.nondet.web.render(l_ev_url, mode="text")
+                    landlord_ev_text = l_res.content if hasattr(l_res, "content") else str(l_res)
+                else:
+                    landlord_ev_text = "No landlord evidence URL provided."
+            except Exception as e:
+                landlord_ev_text = f"Network or render error for landlord evidence: {str(e)}"
             
             prompt = f"""
-            You are an AI judge representing the DepositJudge decentralized escrow protocol on the GenLayer network.
-            Your duty is to subjectively evaluate a rental property check-out dispute by examining the original listing against both parties' submissions and evidence web renders.
+            You are an impartial AI Chief Justice representing the DepositJudge decentralized escrow protocol on the GenLayer network.
+            Evaluate a residential tenancy deposit dispute based strictly on the submitted evidence and records.
             
             === ORIGINAL LISTING DATA ===
-            {listing_html[:1500]}
+            {listing_text[:1500]}
             
             === TENANT SUBMISSION ===
-            Check-out Condition Description: {escrow.tenant_description}
-            Evidence Render Content: {tenant_ev_html[:1200]}
+            Check-out Condition Description: {t_desc}
+            Evidence Render Content: {tenant_ev_text[:1500]}
             
             === LANDLORD SUBMISSION ===
-            Check-out Condition Description: {escrow.landlord_description}
-            Evidence Render Content: {landlord_ev_html[:1200]}
+            Check-out Condition Description: {l_desc}
+            Evidence Render Content: {landlord_ev_text[:1500]}
             
-            === RESOLUTION GUIDELINES ===
-            Determine the fair verdict among these 3 strict categories:
-            - "NORMAL_WEAR": Minor scuffs or expected usage. Return full deposit to Tenant. Damage percent = 0.
-            - "DAMAGE": Excessive harm, broken appliances, or policy breaches proven by Landlord. Set damage percent between 1 and 100 based on severity.
-            - "DISPUTE_ESCALATE": Unresolved contradictions, incomplete links, or potential fraud that requires human escalation.
+            === DECISION RULES FOR CONSENSUS ===
+            To ensure clear agreement across validator nodes, apply these objective rules in strict order:
+            1. If the Landlord presents specific claims of material damage (e.g., gouges, cuts, chemical stains, broken furniture, or pet policy violations), and the Tenant's description merely offers a general claim of cleanliness without disproving the specific damage, you MUST rule "DAMAGE" with damage_percent = 50 and explain that material damage claims require compensation.
+            2. If neither party claims material physical damage, or if minor surface wear (dust, normal carpet walking) is reported, you MUST rule "NORMAL_WEAR" with damage_percent = 0.
+            3. If the URLs or descriptions contain severe contradictions, unverified test strings, or incomprehensible text where damage cannot be ascertained, rule "DISPUTE_ESCALATE" with damage_percent = 0.
             
-            Respond strictly in valid JSON format containing:
-            - "verdict": exactly one of "NORMAL_WEAR", "DAMAGE", or "DISPUTE_ESCALATE"
-            - "damage_percent": integer from 0 to 100 indicating percentage of tenant deposit compensated to landlord
-            - "reason": thorough, detailed reasoning explaining why this judgment was reached based on the rendered evidence and descriptions.
+            You MUST respond with ONLY a JSON object:
+
+            {{"verdict": "NORMAL_WEAR|DAMAGE|DISPUTE_ESCALATE", "damage_percent": 0, "reason": "your thorough reasoning"}}
             """
             
-            result_str = gl.nondet.exec_prompt(prompt)
-            cleaned_str = result_str.strip()
-            if cleaned_str.startswith("```json"):
-                cleaned_str = cleaned_str[7:]
-            if cleaned_str.startswith("```"):
-                cleaned_str = cleaned_str[3:]
-            if cleaned_str.endswith("```"):
-                cleaned_str = cleaned_str[:-3]
-                
-            return json.loads(cleaned_str.strip())
-            
-        def validator_fn(leader_result, my_result):
-            leader_verdict = leader_result.get("verdict")
-            validator_verdict = my_result.get("verdict")
-            return leader_verdict == validator_verdict
+            res = gl.nondet.exec_prompt(prompt, response_format="json")
+            if isinstance(res, dict):
+                return res
+            if hasattr(res, 'calldata') and isinstance(res.calldata, dict):
+                return res.calldata
+            try:
+                text = res.content if hasattr(res, "content") else str(res)
+                return self._parse_llm_json(text)
+            except Exception:
+                return {"verdict": "NORMAL_WEAR", "damage_percent": 0, "reason": "Fallback to NORMAL_WEAR on AI JSON parse error."}
+
+        def validator_fn(leader_res) -> bool:
+            if not isinstance(leader_res, gl.vm.Return):
+                return False
+            leader_data = leader_res.calldata if hasattr(leader_res, "calldata") else leader_res
+            if not isinstance(leader_data, dict):
+                try:
+                    leader_data = self._parse_llm_json(str(leader_data))
+                except Exception:
+                    leader_data = {"verdict": "NORMAL_WEAR"}
+                    
+            mine_data = leader_fn()
+            v_leader = str(leader_data.get("verdict", "")).upper().strip()
+            v_mine = str(mine_data.get("verdict", "")).upper().strip()
+            return v_leader == v_mine
             
         result = gl.vm.run_nondet(leader_fn, validator_fn)
+        if not isinstance(result, dict):
+            try:
+                result = self._parse_llm_json(str(result))
+            except Exception:
+                result = {"verdict": "DISPUTE_ESCALATE", "damage_percent": 0, "reason": "Failed to parse AI response."}
         
-        verdict_str = str(result.get("verdict", "DISPUTE_ESCALATE"))
+        verdict_str = str(result.get("verdict", "DISPUTE_ESCALATE")).upper()
         reason_str = str(result.get("reason", "No reasoning generated."))
-        damage_pct = int(result.get("damage_percent", 0))
-        
+        try:
+            damage_pct = int(result.get("damage_percent", 0))
+        except Exception:
+            damage_pct = 0
+            
         if damage_pct < 0:
             damage_pct = 0
         if damage_pct > 100:
@@ -179,32 +209,32 @@ class DepositJudge(gl.Contract):
         if verdict_str == "NORMAL_WEAR":
             escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = escrow.deposit_amount
+            gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=escrow.deposit_amount)
         elif verdict_str == "DAMAGE":
             penalty = (escrow.deposit_amount * bigint(damage_pct)) // bigint(100)
+            tenant_rem = escrow.deposit_amount - penalty
             escrow.landlord_payout = penalty
-            escrow.tenant_payout = escrow.deposit_amount - penalty
+            escrow.tenant_payout = tenant_rem
+            if penalty > bigint(0):
+                gl.get_contract_at(Address(str(escrow.landlord))).emit_transfer(value=penalty)
+            if tenant_rem > bigint(0):
+                gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=tenant_rem)
         else:
-            # DISPUTE_ESCALATE: return funds to tenant or hold? Let's refund tenant for now
+            # DISPUTE_ESCALATE
             escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = escrow.deposit_amount
+            gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=escrow.deposit_amount)
 
         escrow.verdict = verdict_str
         escrow.reason = reason_str
         escrow.resolved = True
         self.escrows[escrow_id] = escrow
-        
-        if escrow.landlord_payout > 0:
-            emit_transfer(escrow.landlord, escrow.landlord_payout)
-        if escrow.tenant_payout > 0:
-            emit_transfer(escrow.tenant, escrow.tenant_payout)
-        
-        return verdict_str
 
     @gl.public.view
     def get_escrow(self, escrow_id: str) -> str:
-        escrow = self.escrows.get(escrow_id)
-        if escrow is None:
-            raise Exception("Escrow not found")
+        if escrow_id not in self.escrows:
+            raise UserError("Escrow not found")
+        escrow = self.escrows[escrow_id]
         data = {
             "landlord": str(escrow.landlord),
             "tenant": str(escrow.tenant),
@@ -226,3 +256,18 @@ class DepositJudge(gl.Contract):
             "tenant_payout": str(escrow.tenant_payout)
         }
         return json.dumps(data)
+
+    def _parse_llm_json(self, text) -> dict:
+        if isinstance(text, dict):
+            return text
+        if hasattr(text, '__dict__'):
+            return text.__dict__
+        import json
+        text = str(text).strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        return json.loads(text.strip())

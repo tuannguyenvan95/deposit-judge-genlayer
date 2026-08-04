@@ -1,0 +1,6 @@
+Landlord Check-out Inspection & Damage Claim Report (Sealed via IPFS / Verified Timestamp).
+Summary: Severe breach of lease agreement uncovered during final walkthrough inspection.
+Violation Details:
+1. Imported Italian leather sofa shows extensive gouges and cuts from unauthorized pet claws in violation of No-Pets policy.
+2. Master suite marble countertop stained and etched by acidic chemical spillage requiring professional refinishing and polishing.
+Claim Assessment: Estimated restoration cost equates to approximately 40% of locked security deposit vault balance. Verdict requested: DAMAGE with damage_percent set to 40.

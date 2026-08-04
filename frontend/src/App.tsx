@@ -6,7 +6,22 @@ import './index.css'
 
 // Configuration for GenLayer Studio Network (studionet)
 const STUDIO_RPC = 'https://studio.genlayer.com/rpc' 
-const DEFAULT_CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS || '0xbd7D2DE8C2aB169c26A22EE66ad1EDE8Cc846f72'
+const DEFAULT_CONTRACT_ADDRESS = '0xf76C033baEA4F2BE667Ec1A2D8AaDFC74413A2F9'
+
+const formatGen = (val: string | number | undefined | null): string => {
+  if (!val || val === '0' || val === 0) return '0';
+  const s = String(val);
+  if (s.includes('.')) return s;
+  try {
+    if (s.length >= 10) {
+      const num = Number(s) / 1e18;
+      return Number.isInteger(num) ? num.toString() : num.toFixed(4).replace(/\.?0+$/, '');
+    }
+    return s;
+  } catch {
+    return s;
+  }
+};
 
 interface EscrowState {
   escrowId: string;
@@ -246,38 +261,6 @@ function App() {
     window.scrollTo({ top: document.getElementById('console-section')?.offsetTop || 500, behavior: 'smooth' })
   }
 
-  // Demo auto-fill helpers
-  const handleFillDemoCreate = () => {
-    setEscrowId('DUBAI-ROYAL-01')
-    setLandlord('0x71C8A4E2909743e2Ab9f34b7F6B169de00000001')
-    setTenant(walletConnected ? walletAddress : '0x3B41C52E58C2AaF5F1f4438Bc1B20D45B3f8a421')
-    setAmount('5')
-    addLog('Pre-filled Royal Burj Dubai Penthouse lease parameters.')
-  }
-
-  const handleFillDemoEvidenceTenant = () => {
-    setRole('tenant')
-    setListingUrl('https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026')
-    setDescription('Completed checkout in immaculate condition. Marble kitchen counters sanitized, crystal chandelier intact, keys transferred to security vault. Minor floor scratch near wine cooler was explicitly documented during initial check-in protocol.')
-    setEvidenceUrl('https://drive.google.com/drive/folders/dubai-penthouse-video-walkthrough-2026')
-    addLog('Loaded sample Tenant luxury check-out defense record.')
-  }
-
-  const handleFillDemoEvidenceLandlordDamage = () => {
-    setRole('landlord')
-    setListingUrl('https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026')
-    setDescription('Tenant hosted an unauthorized executive gala. Italian marble island features severe acid oxidation stains from unattended glassware, and two original artwork frames in the grand suite suffered structural impact fracture.')
-    setEvidenceUrl('https://imgur.com/a/dubai-penthouse-damage-claim-inspection-2026')
-    addLog('Loaded sample Landlord claim (Severe Luxury Damage Case).')
-  }
-
-  const handleFillDemoEvidenceLandlordNormal = () => {
-    setRole('landlord')
-    setListingUrl('https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026')
-    setDescription('Penthouse returned in acceptable condition. Minor scuffing on hardwood balcony deck is consistent with regular weathering. No furniture or structural fixtures damaged.')
-    setEvidenceUrl('https://imgur.com/a/dubai-penthouse-normal-wear-inspection-2026')
-    addLog('Loaded sample Landlord claim (Normal Wear Protocol).')
-  }
 
   // GenLayer client execution simulator / live connection
   const getClient = () => {
@@ -294,6 +277,35 @@ function App() {
     console.log('GenLayer client initialized for network:', client.chain?.name, 'RPC:', STUDIO_RPC)
     return client
   }
+
+  // Demo Data Auto-Fill Helpers for Judges & Quick Walkthroughs
+  const fillDemoCreateEscrow = () => {
+    const demos = [
+      { id: 'LA-BEVERLY-99', amt: '6' },
+      { id: 'NY-MANHATTAN-PH4', amt: '10' },
+      { id: 'MIA-SOUTH-BEACH-12', amt: '8' },
+      { id: 'ASPEN-CHALET-07', amt: '15' },
+      { id: 'SF-PACIFIC-HGHTS-3', amt: '5' }
+    ];
+    const picked = demos[Math.floor(Math.random() * demos.length)];
+    setEscrowId(picked.id);
+    setAmount(picked.amt);
+    addLog(`[Demo] Auto-filled luxury property lease configuration: ${picked.id} (${picked.amt} GEN)`);
+  };
+
+  const fillDemoEvidence = () => {
+    if (role === 'tenant') {
+      setListingUrl('https://deposit-judge-genlayer.vercel.app/demo-listing.txt');
+      setDescription('All rooms left immaculate, kitchen surfaces cleaned, luxury appliances undamaged, and entrance keys returned promptly to the digital lockbox. No damage occurred during tenancy.');
+      setEvidenceUrl('https://deposit-judge-genlayer.vercel.app/demo-tenant-evidence.txt');
+      addLog('[Demo] Auto-filled Tenant defense walkthrough and IPFS visual verification.');
+    } else {
+      setListingUrl('https://deposit-judge-genlayer.vercel.app/demo-listing.txt');
+      setDescription('Imported Italian leather sofa shows extensive gouges and cuts from unauthorized pet claws in violation of No-Pets policy. Master suite marble countertop etched by chemical spillage.');
+      setEvidenceUrl('https://deposit-judge-genlayer.vercel.app/demo-landlord-damage.txt');
+      addLog('[Demo] Auto-filled Landlord check-out damage claim and visual proof.');
+    }
+  };
 
   // 1. Create & Register Escrow
   const handleCreateEscrow = async (e: React.FormEvent) => {
@@ -322,44 +334,30 @@ function App() {
         return BigInt(whole + fraction)
       })()
 
-      // 1. Create Escrow Structure
+      // 1. Create and Fund Escrow (Atomic Transaction)
+      addLog(`[Tx] Deploying and Funding Vault with ${amount} GEN...`)
       const uniqueEscrowId = `${escrowId}-${Math.floor(Math.random() * 1000000)}`
-      const txHashCreate = await client.writeContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'create_escrow',
-        args: [uniqueEscrowId, getAddress(landlord), getAddress(tenant), amountInWei],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
-      })
-      const receiptCreate = await client.waitForTransactionReceipt({ hash: txHashCreate })
-      if ((receiptCreate as any).status === 7 || (receiptCreate as any).status === 'ERROR' || String((receiptCreate as any).status).toUpperCase() === 'REVERTED') {
-         throw new Error(`create_escrow reverted on-chain. TX: ${txHashCreate}`);
+      try {
+        await client.writeContract({
+          address: contractAddress as `0x${string}`,
+          functionName: 'create_escrow',
+          args: [uniqueEscrowId, getAddress(landlord), getAddress(tenant)],
+          value: amountInWei,
+          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
+        })
+      } catch (wErr: any) {
+        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
+          addLog(`[Network Note] StudioNet RPC socket timed out during tx dispatch; proceeding to poll on-chain validators...`);
+        } else {
+          throw wErr;
+        }
       }
+      await new Promise(r => setTimeout(r, 3000)); // allow validators time to index state
 
-      // 2. Fund Escrow (Tenant)
-      addLog(`[Tx] Funding Escrow with ${amount} GEN...`)
-      const txHashFund = await client.writeContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'fund_escrow_tenant',
-        args: [uniqueEscrowId],
-        value: amountInWei,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
-      })
-      const receiptFund = await client.waitForTransactionReceipt({ hash: txHashFund })
-      if ((receiptFund as any).status === 7 || (receiptFund as any).status === 'ERROR' || String((receiptFund as any).status).toUpperCase() === 'REVERTED') {
-         throw new Error(`fund_escrow_tenant reverted on-chain. TX: ${txHashFund}`);
-      }
-
-      // 3. Read back on-chain state to confirm (with polling)
+      // 2. Read back on-chain state to confirm (with polling)
       addLog(`[On-Chain] Verifying escrow state from contract (waiting for nodes)...`)
       let onChainData: any = null;
-      for (let attempt = 1; attempt <= 15; attempt++) {
+      for (let attempt = 1; attempt <= 5; attempt++) {
         try {
           const escrowDataRaw = await client.readContract({
             address: contractAddress as `0x${string}`,
@@ -373,13 +371,13 @@ function App() {
             break;
           }
         } catch (e: any) {
-          addLog(`[Polling] Attempt ${attempt}/15: Failed to read state - ${e.message}`);
+          addLog(`[Polling] Attempt ${attempt}/5: Failed to read state - ${e.message}`);
         }
         await new Promise(r => setTimeout(r, 2000));
       }
 
       if (!onChainData) {
-        throw new Error(`Could not verify on-chain state after 15 attempts. Network might be slow or transaction reverted.`)
+        throw new Error("Escrow registration failed to index on-chain within waiting period or transaction errored on GenVM.");
       }
 
       const newEscrow: EscrowState = {
@@ -400,8 +398,8 @@ function App() {
         resolved: onChainData.resolved ?? false,
         verdict: onChainData.verdict || 'PENDING',
         reason: onChainData.reason || 'Awaiting evidence submission and AI Tribunal consensus.',
-        landlordPayout: onChainData.landlord_payout || '0',
-        tenantPayout: onChainData.tenant_payout || '0'
+        landlordPayout: formatGen(onChainData.landlord_payout || '0'),
+        tenantPayout: formatGen(onChainData.tenant_payout || '0')
       }
 
       setCurrentEscrow(newEscrow)
@@ -431,26 +429,28 @@ function App() {
     addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
     try {
       const client = getClient()
-      const txHash = await client.writeContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'submit_evidence',
-        args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
-      })
-      const receipt = await client.waitForTransactionReceipt({ hash: txHash })
-      if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
-         throw new Error("Transaction reverted on-chain (Status: ERROR)");
+      try {
+        await client.writeContract({
+          address: contractAddress as `0x${string}`,
+          functionName: 'submit_evidence',
+          args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
+          value: 0n,
+          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
+        })
+      } catch (wErr: any) {
+        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
+          addLog(`[Network Note] StudioNet RPC socket timed out during evidence transmission; verifying on-chain storage...`);
+        } else {
+          throw wErr;
+        }
       }
+      await new Promise(r => setTimeout(r, 3000)); // allow validators time to index state
       
       // Read back on-chain state to confirm evidence was stored (with polling)
       addLog(`[On-Chain] Verifying evidence state for ${currentEscrow.escrowId}...`)
       
       let onChainData: any = null;
-      for (let attempt = 1; attempt <= 15; attempt++) {
+      for (let attempt = 1; attempt <= 5; attempt++) {
         try {
           const escrowDataRaw = await client.readContract({
             address: contractAddress as `0x${string}`,
@@ -468,13 +468,13 @@ function App() {
           }
           throw new Error("State fetched but evidence field is still false.");
         } catch (e: any) {
-          addLog(`[Polling] Attempt ${attempt}/15: ${e.message}`);
+          addLog(`[Polling] Attempt ${attempt}/5: ${e.message}`);
           await new Promise(r => setTimeout(r, 2000));
         }
       }
 
       if (!onChainData) {
-        throw new Error(`Could not verify on-chain state after 15 attempts. It may still be processing or the transaction reverted.`);
+        throw new Error("Evidence submission failed to verify on-chain within waiting period or transaction errored on GenVM.");
       }
 
       const updated: EscrowState = {
@@ -531,29 +531,33 @@ function App() {
     // Call the AI consensus execution on GenLayer
     try {
       const client = getClient()
-      const txHash = await client.writeContract({
-        address: contractAddress as `0x${string}`,
-        functionName: 'resolve_dispute',
-        args: [currentEscrow.escrowId],
-        value: 0n,
-        // @ts-ignore
-        maxFeePerGas: 500000000n,
-        // @ts-ignore
-        maxPriorityFeePerGas: 500000000n
-      })
+      try {
+        await client.writeContract({
+          address: contractAddress as `0x${string}`,
+          functionName: 'resolve_dispute',
+          args: [currentEscrow.escrowId],
+          value: 0n,
+          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
+        })
+      } catch (wErr: any) {
+        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
+          addLog(`[AI Tribunal Note] StudioNet HTTP timeout reached while validators execute web renders & LLM. Proceeding to poll consensus state...`);
+        } else {
+          throw wErr;
+        }
+      }
       
       setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      const receipt = await client.waitForTransactionReceipt({ hash: txHash })
-      if ((receipt as any).status === 7 || (receipt as any).status === 'ERROR' || (receipt as any).status === 'REVERTED') {
-         throw new Error("Transaction reverted on-chain (Status: ERROR)");
-      }
+      await new Promise(r => setTimeout(r, 4000)); // allow validators time to index consensus state
       
       // Read actual on-chain result from the contract (with polling)
       addLog(`[On-Chain] Reading escrow state from contract (waiting for consensus)...`)
       
       let onChainData: any = null;
-      for (let attempt = 1; attempt <= 15; attempt++) {
+      const totalAttempts = 25; // StudioNet web.render + LLM consensus typically takes ~30-50s
+      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
         try {
+          setAiStage(`Validator nodes executing AI prompt & consensus (Attempt ${attempt}/${totalAttempts})...`);
           const escrowDataRaw = await client.readContract({
             address: contractAddress as `0x${string}`,
             functionName: 'get_escrow',
@@ -563,29 +567,24 @@ function App() {
           
           if (parsed && parsed.resolved) {
             onChainData = parsed;
-            addLog(`[Success] Verified AI consensus on-chain!`);
+            addLog(`[Success] Verified AI consensus on-chain after ${attempt} attempts!`);
             break;
           }
           throw new Error("Escrow not yet resolved");
         } catch (e) {
-          addLog(`[Polling] Attempt ${attempt}/15: AI consensus not yet reached on node...`);
-          await new Promise(r => setTimeout(r, 2000));
+          addLog(`[Polling] Attempt ${attempt}/${totalAttempts}: AI consensus executing on validators...`);
+          await new Promise(r => setTimeout(r, 4000));
         }
       }
 
-      let verdict = 'DISPUTE_ESCALATE'
-      let reason = 'Unable to parse on-chain result.'
-      let landlordPayout = '0'
-      let tenantPayout = '0'
-
-      if (onChainData) {
-        verdict = onChainData.verdict || 'DISPUTE_ESCALATE'
-        reason = onChainData.reason || 'No reasoning returned from AI consensus.'
-        landlordPayout = onChainData.landlord_payout || '0'
-        tenantPayout = onChainData.tenant_payout || '0'
-      } else {
-        addLog(`[Warning] Could not get resolved state after 15 attempts. Network might be slow.`)
+      if (!onChainData) {
+        throw new Error("Consensus resolution did not finalize on-chain (transaction errored or was rejected by GenVM validators). No mock fallbacks allowed.");
       }
+
+      const verdict = onChainData.verdict || 'NORMAL_WEAR'
+      const reason = onChainData.reason || 'No reasoning returned from AI consensus.'
+      const landlordPayout = formatGen(onChainData.landlord_payout || '0')
+      const tenantPayout = formatGen(onChainData.tenant_payout || currentEscrow.depositAmount)
 
       const resolvedEscrow: EscrowState = {
         ...currentEscrow,
@@ -753,13 +752,9 @@ function App() {
           {activeTab === 'create' && (
             <div>
               <div className="panel-header">
-                <h2 className="panel-title"><span>🏰</span> Register New Lease Escrow</h2>
-                <button 
-                  type="button" 
-                  className="btn-secondary" 
-                  onClick={handleFillDemoCreate}
-                >
-                  ✨ Auto-fill Dubai Penthouse Demo
+                <h2 className="panel-title"><span>📝</span> Register New Lease Escrow</h2>
+                <button type="button" onClick={fillDemoCreateEscrow} className="btn-demo">
+                  ⚡ Auto-fill Demo Data
                 </button>
               </div>
               <div className="panel-body">
@@ -815,18 +810,10 @@ function App() {
           {activeTab === 'evidence' && (
             <div>
               <div className="panel-header">
-                <h2 className="panel-title"><span>📸</span> Check-out Evidence Protocol</h2>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button type="button" className="btn-secondary" onClick={handleFillDemoEvidenceTenant}>
-                    👤 Tenant Proof
-                  </button>
-                  <button type="button" className="btn-secondary" onClick={handleFillDemoEvidenceLandlordDamage} style={{ borderColor: '#ef4444' }}>
-                    ⚠️ Damage Claim
-                  </button>
-                  <button type="button" className="btn-secondary" onClick={handleFillDemoEvidenceLandlordNormal} style={{ borderColor: '#10b981' }}>
-                    ✨ Normal Wear Claim
-                  </button>
-                </div>
+                <h2 className="panel-title"><span>📁</span> Check-out Evidence Protocol</h2>
+                <button type="button" onClick={fillDemoEvidence} className="btn-demo">
+                  ⚡ Auto-fill Demo Data
+                </button>
               </div>
               <div className="panel-body">
                 <form onSubmit={handleSubmitEvidence}>
@@ -960,8 +947,8 @@ function App() {
                       {currentEscrow.reason}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '1.25rem', fontFamily: 'Plus Jakarta Sans', fontWeight: '700' }}>
-                      <div>🏰 Landlord Compensation: <span style={{ color: '#f3e5ab' }}>{currentEscrow.landlordPayout} GEN</span></div>
-                      <div>👤 Tenant Refund: <span style={{ color: '#34d399' }}>{currentEscrow.tenantPayout} GEN</span></div>
+                      <div>🏰 Landlord Compensation: <span style={{ color: '#f3e5ab' }}>{formatGen(currentEscrow.landlordPayout)} GEN</span></div>
+                      <div>👤 Tenant Refund: <span style={{ color: '#34d399' }}>{formatGen(currentEscrow.tenantPayout)} GEN</span></div>
                     </div>
                   </div>
                 )}
@@ -1055,7 +1042,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.95rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Security Deposit Vault:</span>
-                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{currentEscrow.depositAmount} GEN/GEN</span>
+                    <span style={{ fontWeight: '800', color: 'var(--gold-light)', fontFamily: 'Playfair Display', fontSize: '1.2rem' }}>{formatGen(currentEscrow.depositAmount)} GEN</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.85rem', background: 'rgba(0,0,0,0.4)', borderRadius: '12px' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Landlord Executive Address:</span>
@@ -1208,7 +1195,7 @@ function App() {
             <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--gold-light)', fontWeight: '700', letterSpacing: '1px' }}>Studionet Immutable Contract</div>
               <code style={{ fontSize: '0.82rem', color: '#34d399', display: 'block', margin: '0.3rem 0', wordBreak: 'break-all' }}>{DEFAULT_CONTRACT_ADDRESS}</code>
-              <a href={`https://genlayer-explorer.vercel.app/address/${DEFAULT_CONTRACT_ADDRESS}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--gold-primary)', textDecoration: 'underline' }}>
+              <a href={`https://explorer-studio.genlayer.com/address/${DEFAULT_CONTRACT_ADDRESS}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--gold-primary)', textDecoration: 'underline' }}>
                 Verify in GenLayer Studio Explorer ↗
               </a>
             </div>
@@ -1243,7 +1230,7 @@ function App() {
           <div className="footer-col">
             <h3>Ecosystem Navigation</h3>
             <ul className="footer-links">
-              <li><a href={`https://genlayer-explorer.vercel.app/address/${DEFAULT_CONTRACT_ADDRESS}`} target="_blank" rel="noreferrer">🔍 Studionet Live Explorer</a></li>
+              <li><a href={`https://explorer-studio.genlayer.com/address/${DEFAULT_CONTRACT_ADDRESS}`} target="_blank" rel="noreferrer">🔍 Studionet Live Explorer</a></li>
               <li><a href="https://studio.genlayer.com" target="_blank" rel="noreferrer">⚡ GenLayer Studio Portal</a></li>
               <li><a href="https://docs.genlayer.com" target="_blank" rel="noreferrer">📜 Intelligent Contract Architecture</a></li>
               <li><a href="https://github.com/tuannguyenvan95/deposit-judge-genlayer" target="_blank" rel="noreferrer">🐱 Open Source Repository</a></li>
