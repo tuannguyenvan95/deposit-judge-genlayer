@@ -35,14 +35,23 @@ class Contract(gl.Contract):
     @gl.public.write.payable
     def create_escrow(self, escrow_id: str, landlord: str, tenant: str) -> str:
         amount = gl.message.value
+        sender = gl.message.sender_address
         if amount <= bigint(0):
             raise UserError("Deposit amount must be greater than 0")
         if escrow_id in self.escrows:
             raise UserError("Escrow ID already exists")
         
+        landlord_addr = Address(str(landlord))
+        tenant_addr = Address(str(tenant))
+        
+        if sender != landlord_addr and sender != tenant_addr:
+            raise UserError("Authentication failed: Caller must be either the designated Landlord or Tenant")
+        if landlord_addr == tenant_addr:
+            raise UserError("Landlord and Tenant cannot be the same address")
+        
         self.escrows[escrow_id] = Escrow(
-            landlord=Address(str(landlord)),
-            tenant=Address(str(tenant)),
+            landlord=landlord_addr,
+            tenant=tenant_addr,
             deposit_amount=amount,
             landlord_funded=True,
             tenant_funded=True,
@@ -72,6 +81,10 @@ class Contract(gl.Contract):
         if escrow.resolved:
             raise UserError("Escrow dispute has already been resolved")
             
+        sender = gl.message.sender_address
+        if sender != escrow.tenant and sender != escrow.landlord:
+            raise UserError("Authentication failed: Only authenticated escrow participants can submit evidence")
+
         clean_role = role.strip().lower()
         if clean_role == "tenant":
             escrow.tenant_listing_url = listing_url
@@ -97,6 +110,10 @@ class Contract(gl.Contract):
             raise UserError("Escrow dispute already resolved")
         if not escrow.tenant_evidence_submitted and not escrow.landlord_evidence_submitted:
             raise UserError("At least one party must submit evidence before triggering AI judge resolution")
+
+        sender = gl.message.sender_address
+        if sender != escrow.landlord and sender != escrow.tenant:
+            raise UserError("Authentication failed: Only the authenticated Landlord or Tenant can invoke AI Tribunal resolution and fund settlement")
 
         # Extract storage fields to local strings before entering nondeterministic lambda
         t_listing = str(escrow.tenant_listing_url)

@@ -6,7 +6,7 @@ import './index.css'
 
 // Configuration for GenLayer Studio Network (studionet)
 const STUDIO_RPC = 'https://studio.genlayer.com/rpc' 
-const DEFAULT_CONTRACT_ADDRESS = '0xf76C033baEA4F2BE667Ec1A2D8AaDFC74413A2F9'
+const DEFAULT_CONTRACT_ADDRESS = '0x57aE0D2624bC0cb7184232BaC19C719E439F3C27'
 
 const formatGen = (val: string | number | undefined | null): string => {
   if (!val || val === '0' || val === 0) return '0';
@@ -22,6 +22,17 @@ const formatGen = (val: string | number | undefined | null): string => {
     return s;
   }
 };
+
+// Persistent session account for simulated/non-MetaMask testing so caller address stays authenticated across transactions
+const getSessionAccount = () => {
+  if (typeof window !== 'undefined') {
+    if (!(window as any)._genlayer_session_account) {
+      (window as any)._genlayer_session_account = createAccount()
+    }
+    return (window as any)._genlayer_session_account
+  }
+  return createAccount()
+}
 
 interface EscrowState {
   escrowId: string;
@@ -140,7 +151,7 @@ function App() {
   // Form State for Escrow Creation
   const [escrowId, setEscrowId] = useState('NYC-TRIBECA-88')
   const [landlord, setLandlord] = useState('0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7')
-  const [tenant, setTenant] = useState('0x3B41C52E58C2AaF5F1f4438Bc1B20D45B3f8a421')
+  const [tenant, setTenant] = useState(getSessionAccount().address)
   const [amount, setAmount] = useState('3500')
 
   // Form State for Evidence Submission
@@ -211,7 +222,7 @@ function App() {
   }, [])
 
   // Web3 Wallet Connector Handlers
-  const handleConnectWallet = async (type: string, mockAddress?: string, mockBalance?: string) => {
+  const handleConnectWallet = async (type: string, _mockAddress?: string, mockBalance?: string) => {
     try {
       if (typeof window !== 'undefined' && (window as any).ethereum) {
         const provider = (window as any).ethereum
@@ -225,13 +236,14 @@ function App() {
         addLog(`[Web3 Auth] Connected executive signer: ${address} via MetaMask`)
       } else {
         alert("Please install MetaMask to connect a real wallet. Using simulated wallet for now.");
-        // Fallback for mocks
+        const sessionAddr = getSessionAccount().address
         setWalletConnected(true)
         setWalletType(type)
-        setWalletAddress(mockAddress || '0xSimulatedWalletAddress')
+        setWalletAddress(sessionAddr)
+        setTenant(sessionAddr)
         setWalletBalance(mockBalance || '10,000 GEN')
         setShowWalletModal(false)
-        addLog(`[Web3 Auth] Connected executive signer: ${mockAddress || '0xSimulatedWalletAddress'} via ${type}`)
+        addLog(`[Web3 Auth] Connected GenLayer Studio session signer: ${sessionAddr} via ${type}`)
       }
     } catch (err) {
       addLog(`[Web3 Auth] Connection failed: ${String(err)}`)
@@ -254,7 +266,7 @@ function App() {
     if (walletConnected && walletAddress) {
       setTenant(walletAddress)
     } else {
-      setTenant('0x3B41C52E58C2AaF5F1f4438Bc1B20D45B3f8a421')
+      setTenant(getSessionAccount().address)
     }
     setActiveTab('create')
     addLog(`[Lease Selected] Loaded luxury specifications for: ${property.title} (${property.location})`)
@@ -265,13 +277,11 @@ function App() {
   // GenLayer client execution simulator / live connection
   const getClient = () => {
     const config: any = { chain: studionet }
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
+    if (typeof window !== 'undefined' && (window as any).ethereum && walletConnected && walletAddress && walletType.includes('MetaMask')) {
       config.provider = (window as any).ethereum
-      if (walletAddress && walletAddress !== '0xSimulatedWalletAddress') {
-        config.account = walletAddress
-      }
+      config.account = walletAddress
     } else {
-      config.account = createAccount()
+      config.account = getSessionAccount()
     }
     const client = createClient(config)
     console.log('GenLayer client initialized for network:', client.chain?.name, 'RPC:', STUDIO_RPC)
