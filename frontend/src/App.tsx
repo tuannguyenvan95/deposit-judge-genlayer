@@ -166,6 +166,10 @@ function App() {
 
   // Toggle Dev Mode - simulates wallet connection without MetaMask
   const handleToggleDevMode = () => {
+    if (!import.meta.env.DEV) {
+      alert("Dev Mode is strictly disabled in production to ensure 100% genuine GenLayer on-chain verification without mocks.");
+      return;
+    }
     if (devMode) {
       // Turning OFF dev mode
       setDevMode(false)
@@ -363,7 +367,7 @@ function App() {
     addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
 
     // --- DEV MODE: simulate escrow creation locally ---
-    if (devMode) {
+    if (import.meta.env.DEV && devMode) {
       await new Promise(r => setTimeout(r, 1500))
       const uniqueEscrowId = `${escrowId}-DEV-${Math.floor(Math.random() * 1000000)}`
       const mockEscrow: EscrowState = {
@@ -504,7 +508,7 @@ function App() {
     addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
 
     // --- DEV MODE: simulate evidence submission locally ---
-    if (devMode) {
+    if (import.meta.env.DEV && devMode) {
       await new Promise(r => setTimeout(r, 1200))
       const updated: EscrowState = {
         ...currentEscrow,
@@ -640,7 +644,7 @@ function App() {
     addLog(`Invoking GenLayer consensus resolution: resolve_dispute('${currentEscrow.escrowId}')`)
 
     // --- DEV MODE: simulate AI judge resolution locally ---
-    if (devMode) {
+    if (import.meta.env.DEV && devMode) {
       setAiStage('Leader Node Evidence Acquisition...')
       await new Promise(r => setTimeout(r, 1500))
       setAiStage('Llama-3-Vision Subjective Arbitration...')
