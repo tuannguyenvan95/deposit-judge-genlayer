@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 .vercel
+\n# Playwright test results\ntest-results/
+e2e/screenshots/

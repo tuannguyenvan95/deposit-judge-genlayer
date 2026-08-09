@@ -3,25 +3,13 @@ import { createClient } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
 import { getAddress } from 'viem'
 import './index.css'
+import { formatGen } from './utils'
 
 // Configuration for GenLayer Studio Network (studionet)
-const STUDIO_RPC = 'https://studio.genlayer.com/rpc' 
 const DEFAULT_CONTRACT_ADDRESS = '0x839828eC875dC7c1EDFEb1CF5b595bBCae4911dD'
-
-const formatGen = (val: string | number | undefined | null): string => {
-  if (!val || val === '0' || val === 0) return '0';
-  const s = String(val);
-  if (s.includes('.')) return s;
-  try {
-    if (s.length >= 10) {
-      const num = Number(s) / 1e18;
-      return Number.isInteger(num) ? num.toString() : num.toFixed(4).replace(/\.?0+$/, '');
-    }
-    return s;
-  } catch {
-    return s;
-  }
-};
+const DEV_WALLET_ADDRESS = '0xDEADBEEF00000000000000000000000000000001'
+const GEN_FAUCET_URL = 'https://studio.genlayer.com'
+const GEN_TESTNET_FAUCET_URL = 'https://testnet-faucet.genlayer.foundation/'
 
 interface EscrowState {
   escrowId: string;
@@ -136,6 +124,7 @@ function App() {
   const [walletAddress, setWalletAddress] = useState('')
   const [walletType, setWalletType] = useState('')
   const [walletBalance, setWalletBalance] = useState('')
+  const [devMode, setDevMode] = useState(false)
 
   // Form State for Escrow Creation
   const [escrowId, setEscrowId] = useState('NYC-TRIBECA-88')
@@ -165,7 +154,7 @@ function App() {
             setWalletConnected(true)
             setWalletType('MetaMask (Injected)')
             setWalletAddress(accounts[0])
-            setWalletBalance('Checking...')
+            fetchBalance(accounts[0])
           }
         } catch (err) {
           console.error("Failed to re-hydrate wallet connection:", err)
@@ -174,6 +163,54 @@ function App() {
     }
     checkConnection()
   }, [])
+
+  // Toggle Dev Mode - simulates wallet connection without MetaMask
+  const handleToggleDevMode = () => {
+    if (devMode) {
+      // Turning OFF dev mode
+      setDevMode(false)
+      setWalletConnected(false)
+      setWalletAddress('')
+      setTenant('')
+      setWalletType('')
+      setWalletBalance('')
+      addLog('[Dev Mode] Disabled — reconnected to real wallet provider')
+    } else {
+      // Turning ON dev mode
+      setDevMode(true)
+      setWalletConnected(true)
+      setWalletType('Dev Mode (Simulated)')
+      setWalletAddress(DEV_WALLET_ADDRESS)
+      setTenant(DEV_WALLET_ADDRESS)
+      setWalletBalance('100,000 GEN (simulated)')
+      setShowWalletModal(false)
+      addLog(`[Dev Mode] Enabled — using simulated wallet: ${DEV_WALLET_ADDRESS}`)
+    }
+  }
+
+  // Fetch real wallet balance via eth_getBalance
+  const fetchBalance = async (address: string) => {
+    try {
+      const provider = (window as any).ethereum
+      if (!provider) return
+      const balanceHex: string = await provider.request({
+        method: 'eth_getBalance',
+        params: [address, 'latest']
+      })
+      const balanceWei = BigInt(balanceHex)
+      const balanceGen = Number(balanceWei) / 1e18
+      if (balanceGen === 0) {
+        setWalletBalance('0 GEN')
+      } else if (balanceGen < 0.0001) {
+        setWalletBalance('< 0.0001 GEN')
+      } else {
+        setWalletBalance(`${balanceGen.toFixed(4).replace(/\.?0+$/, '')} GEN`)
+      }
+    } catch (err) {
+      console.error('Failed to fetch wallet balance:', err)
+      setWalletBalance('Connected')
+    }
+  }
 
   // Add diagnostic log message
   const addLog = (msg: string) => {
@@ -221,7 +258,7 @@ function App() {
         setWalletType('MetaMask (Injected)')
         setWalletAddress(address)
         setTenant(address)
-        setWalletBalance('Active On-Chain')
+        fetchBalance(address)
         setShowWalletModal(false)
         addLog(`[Web3 Auth] Connected real on-chain signer: ${address} via ${type}`)
       } else {
@@ -265,7 +302,7 @@ function App() {
       config.account = walletAddress
     }
     const client = createClient(config)
-    console.log('GenLayer client initialized for network:', client.chain?.name, 'RPC:', STUDIO_RPC)
+    console.log('GenLayer client initialized for network:', client.chain?.name)
     return client
   }
 
@@ -298,7 +335,7 @@ function App() {
     }
   };
 
-  // 1. Create & Register Escrow (Real On-Chain Only)
+  // 1. Create & Register Escrow
   const handleCreateEscrow = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!walletConnected || !walletAddress) {
@@ -307,6 +344,11 @@ function App() {
     }
     if (!escrowId || !landlord || !tenant || !amount) {
       alert('Please fill in all mandatory parameters.')
+      return
+    }
+    const parsedAmount = parseFloat(amount.replace(',', '.'));
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert('Deposit amount must be a positive number greater than 0 GEN.')
       return
     }
     if (!landlord.match(/^0x[a-fA-F0-9]{40}$/)) {
@@ -319,6 +361,40 @@ function App() {
     }
     setLoading('creating')
     addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
+
+    // --- DEV MODE: simulate escrow creation locally ---
+    if (devMode) {
+      await new Promise(r => setTimeout(r, 1500))
+      const uniqueEscrowId = `${escrowId}-DEV-${Math.floor(Math.random() * 1000000)}`
+      const mockEscrow: EscrowState = {
+        escrowId: uniqueEscrowId,
+        landlord: landlord,
+        tenant: tenant,
+        depositAmount: amount,
+        landlordFunded: true,
+        tenantFunded: true,
+        tenantSubmitted: false,
+        tenantListingUrl: '',
+        tenantDescription: '',
+        tenantEvidenceUrl: '',
+        landlordSubmitted: false,
+        landlordListingUrl: '',
+        landlordDescription: '',
+        landlordEvidenceUrl: '',
+        resolved: false,
+        verdict: 'PENDING',
+        reason: 'Awaiting evidence submission and AI Tribunal consensus.',
+        landlordPayout: '0',
+        tenantPayout: '0'
+      }
+      setCurrentEscrow(mockEscrow)
+      addLog(`[Dev Mode] Escrow created locally: ${uniqueEscrowId} | Deposit: ${amount} GEN`)
+      setActiveTab('evidence')
+      setLoading(null)
+      return
+    }
+
+    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
       
@@ -426,6 +502,31 @@ function App() {
 
     setLoading(`submitting-${role}`)
     addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
+
+    // --- DEV MODE: simulate evidence submission locally ---
+    if (devMode) {
+      await new Promise(r => setTimeout(r, 1200))
+      const updated: EscrowState = {
+        ...currentEscrow,
+        tenantSubmitted: role === 'tenant' ? true : currentEscrow.tenantSubmitted,
+        tenantListingUrl: role === 'tenant' ? listingUrl : currentEscrow.tenantListingUrl,
+        tenantDescription: role === 'tenant' ? description : currentEscrow.tenantDescription,
+        tenantEvidenceUrl: role === 'tenant' ? evidenceUrl : currentEscrow.tenantEvidenceUrl,
+        landlordSubmitted: role === 'landlord' ? true : currentEscrow.landlordSubmitted,
+        landlordListingUrl: role === 'landlord' ? listingUrl : currentEscrow.landlordListingUrl,
+        landlordDescription: role === 'landlord' ? description : currentEscrow.landlordDescription,
+        landlordEvidenceUrl: role === 'landlord' ? evidenceUrl : currentEscrow.landlordEvidenceUrl,
+      }
+      setCurrentEscrow(updated)
+      addLog(`[Dev Mode] ${role.toUpperCase()} evidence sealed locally.`)
+      if (updated.tenantSubmitted || updated.landlordSubmitted) {
+        setActiveTab('judge')
+      }
+      setLoading(null)
+      return
+    }
+
+    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
       try {
@@ -537,8 +638,42 @@ function App() {
 
     setLoading('resolving')
     addLog(`Invoking GenLayer consensus resolution: resolve_dispute('${currentEscrow.escrowId}')`)
-    
-    // Call the AI consensus execution on GenLayer
+
+    // --- DEV MODE: simulate AI judge resolution locally ---
+    if (devMode) {
+      setAiStage('Leader Node Evidence Acquisition...')
+      await new Promise(r => setTimeout(r, 1500))
+      setAiStage('Llama-3-Vision Subjective Arbitration...')
+      await new Promise(r => setTimeout(r, 1500))
+      setAiStage('Decentralized Validator Consensus...')
+      await new Promise(r => setTimeout(r, 1500))
+
+      // Simulate verdict — randomly pick NORMAL_WEAR or DAMAGE for demo variety
+      const mockVerdict = Math.random() > 0.5 ? 'NORMAL_WEAR' : 'DAMAGE'
+      const depositAmt = parseFloat(currentEscrow.depositAmount) || 0
+      const damagePct = mockVerdict === 'DAMAGE' ? 30 : 0
+      const landlordPay = mockVerdict === 'DAMAGE' ? (depositAmt * damagePct / 100).toFixed(2) : '0'
+      const tenantPay = mockVerdict === 'DAMAGE' ? (depositAmt * (100 - damagePct) / 100).toFixed(2) : currentEscrow.depositAmount
+
+      const resolvedEscrow: EscrowState = {
+        ...currentEscrow,
+        resolved: true,
+        verdict: mockVerdict,
+        reason: mockVerdict === 'NORMAL_WEAR'
+          ? 'AI Tribunal consensus: Property checkout inspection reveals normal wear and tear consistent with standard tenancy. No material damage detected. Full deposit refund recommended.'
+          : 'AI Tribunal consensus: Material damage identified — imported leather sofa shows unauthorized pet gouges and master suite marble countertop etched by chemical spillage. Partial compensation required.',
+        landlordPayout: landlordPay,
+        tenantPayout: tenantPay
+      }
+
+      setCurrentEscrow(resolvedEscrow)
+      setAiStage('')
+      setLoading(null)
+      addLog(`[Dev Mode] Consensus finalized: ${mockVerdict} | Landlord: ${landlordPay} GEN | Tenant: ${tenantPay} GEN`)
+      return
+    }
+
+    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
       try {
@@ -581,7 +716,7 @@ function App() {
             break;
           }
           throw new Error("Escrow not yet resolved");
-        } catch (e) {
+        } catch {
           addLog(`[Polling] Attempt ${attempt}/${totalAttempts}: AI consensus executing on validators...`);
           await new Promise(r => setTimeout(r, 4000));
         }
@@ -643,6 +778,7 @@ function App() {
             <div className="contract-input-box">
               <span>VAULT:</span>
               <input 
+                id="contract-address"
                 type="text" 
                 value={contractAddress} 
                 onChange={(e) => setContractAddress(e.target.value)}
@@ -652,23 +788,99 @@ function App() {
             </div>
           </div>
 
-          {/* Connect Web3 Wallet Button */}
-          {!walletConnected ? (
-            <button 
-              className="btn-connect-wallet"
-              onClick={() => setShowWalletModal(true)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Dev Mode Toggle */}
+            <div 
+              onClick={handleToggleDevMode}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.45rem 0.9rem',
+                borderRadius: '999px',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: '700',
+                letterSpacing: '0.5px',
+                border: devMode ? '1px solid #f59e0b' : '1px solid var(--border-color)',
+                background: devMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.05)',
+                color: devMode ? '#fde68a' : 'var(--text-muted)',
+                transition: 'all 0.3s ease',
+                boxShadow: devMode ? '0 0 12px rgba(245, 158, 11, 0.3)' : 'none',
+                userSelect: 'none' as const
+              }}
+              title="Toggle Dev Mode to simulate wallet & on-chain transactions without MetaMask"
             >
-              <span>⚡ Connect Web3 Wallet</span>
-            </button>
-          ) : (
-            <button 
-              className="btn-connect-wallet btn-wallet-connected"
-              onClick={() => setShowWalletModal(true)}
-            >
-              <div className="wallet-avatar">🛡️</div>
-              <span>{walletAddress} ({walletBalance})</span>
-            </button>
-          )}
+              <span style={{ fontSize: '1rem' }}>{devMode ? '🧪' : '🔧'}</span>
+              <span>{devMode ? 'DEV MODE' : 'DEV'}</span>
+              <div style={{
+                width: '32px',
+                height: '18px',
+                borderRadius: '9px',
+                background: devMode ? '#f59e0b' : 'rgba(255,255,255,0.15)',
+                position: 'relative',
+                transition: 'background 0.3s ease'
+              }}>
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: devMode ? '#080a0e' : 'var(--text-muted)',
+                  position: 'absolute',
+                  top: '2px',
+                  left: devMode ? '16px' : '2px',
+                  transition: 'all 0.3s ease'
+                }}/>
+              </div>
+            </div>
+
+            {/* Connect Web3 Wallet Button */}
+            {!walletConnected ? (
+              <button 
+                className="btn-connect-wallet"
+                onClick={() => setShowWalletModal(true)}
+              >
+                <span>⚡ Connect Web3 Wallet</span>
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {/* Low balance warning + Get GEN faucet button */}
+                {!devMode && walletBalance && (walletBalance === '0 GEN' || walletBalance.startsWith('< ')) && (
+                  <a
+                    href={GEN_FAUCET_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Get free GEN tokens from GenLayer Studio faucet"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.7rem',
+                      borderRadius: '999px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      color: '#fca5a5',
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      textDecoration: 'none',
+                      transition: 'all 0.3s ease',
+                      whiteSpace: 'nowrap' as const
+                    }}
+                  >
+                    <span>💧</span>
+                    <span>Get GEN</span>
+                  </a>
+                )}
+                <button 
+                  className="btn-connect-wallet btn-wallet-connected"
+                  onClick={() => setShowWalletModal(true)}
+                >
+                  <div className="wallet-avatar">{devMode ? '🧪' : '🛡️'}</div>
+                  <span>{walletAddress.slice(0, 8)}...{walletAddress.slice(-4)} ({walletBalance})</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -770,8 +982,9 @@ function App() {
               <div className="panel-body">
                 <form onSubmit={handleCreateEscrow}>
                   <div className="form-group">
-                    <label>Lease Escrow Identifier (ID)</label>
+                    <label htmlFor="escrow-id">Lease Escrow Identifier (ID)</label>
                     <input 
+                      id="escrow-id"
                       type="text" 
                       className="form-input" 
                       value={escrowId} 
@@ -780,8 +993,9 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Landlord Executive Vault Address</label>
+                    <label htmlFor="landlord-addr">Landlord Executive Vault Address</label>
                     <input 
+                      id="landlord-addr"
                       type="text" 
                       className="form-input" 
                       value={landlord} 
@@ -790,8 +1004,9 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Tenant Web3 Signer Address {walletConnected && <span style={{color: '#34d399'}}> (Connected via {walletType})</span>}</label>
+                    <label htmlFor="tenant-addr">Tenant Web3 Signer Address {walletConnected && <span style={{color: '#34d399'}}> (Connected via {walletType})</span>}</label>
                     <input 
+                      id="tenant-addr"
                       type="text" 
                       className="form-input" 
                       value={tenant} 
@@ -800,8 +1015,9 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Security Deposit Amount (GEN)</label>
+                    <label htmlFor="deposit-amount">Security Deposit Amount (GEN)</label>
                     <input 
+                      id="deposit-amount"
                       type="number" 
                       className="form-input" 
                       value={amount} 
@@ -828,8 +1044,9 @@ function App() {
               <div className="panel-body">
                 <form onSubmit={handleSubmitEvidence}>
                   <div className="form-group">
-                    <label>Select Submitting Role</label>
+                    <label htmlFor="submit-role">Select Submitting Role</label>
                     <select 
+                      id="submit-role"
                       className="form-input" 
                       value={role} 
                       onChange={e => setRole(e.target.value as 'tenant' | 'landlord')}
@@ -839,8 +1056,9 @@ function App() {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Original Property Listing URL (Airbnb / Booking / Luxury Estate)</label>
+                    <label htmlFor="listing-url">Original Property Listing URL (Airbnb / Booking / Luxury Estate)</label>
                     <input 
+                      id="listing-url"
                       type="text" 
                       className="form-input" 
                       value={listingUrl} 
@@ -849,8 +1067,9 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Check-out Inspection Notes & Condition Description</label>
+                    <label htmlFor="inspection-notes">Check-out Inspection Notes & Condition Description</label>
                     <textarea 
+                      id="inspection-notes"
                       className="form-input" 
                       rows={4}
                       value={description} 
@@ -859,7 +1078,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Photo & Video Evidence Repository (IPFS Upload)</label>
+                    <label htmlFor="evidence-upload">Photo & Video Evidence Repository (IPFS Upload)</label>
                     <div className="ipfs-upload-box">
                       {uploadingIpfs ? (
                         <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--gold-light)' }}>
@@ -874,6 +1093,7 @@ function App() {
                         <div style={{ position: 'relative', padding: '1.25rem', textAlign: 'center', border: '1px dashed var(--border-gold)', borderRadius: '8px', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', transition: 'all 0.3s' }}>
                           <span style={{ color: 'var(--text-muted)' }}>📸 Click to select & pin visual evidence to IPFS</span>
                           <input 
+                            id="evidence-upload"
                             type="file" 
                             accept="image/*,video/*"
                             onChange={handleUploadFile}
@@ -1137,6 +1357,17 @@ function App() {
               <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>CONNECT REAL WALLET ⚡</span>
             </div>
 
+            <div className="wallet-option" onClick={handleToggleDevMode} style={devMode ? { borderColor: '#f59e0b', background: 'rgba(245, 158, 11, 0.08)' } : {}}>
+              <div className="wallet-option-left">
+                <div className="wallet-icon-box">🧪</div>
+                <div>
+                  <h4 className="wallet-name">Dev Mode (Simulated Wallet)</h4>
+                  <p className="wallet-desc">Test the full flow without MetaMask or GEN tokens</p>
+                </div>
+              </div>
+              <span style={{ color: devMode ? '#fde68a' : '#94a3b8', fontWeight: '700', fontSize: '0.85rem' }}>{devMode ? 'ACTIVE ✓' : 'ENABLE DEV MODE'}</span>
+            </div>
+
             {walletConnected && (
               <button 
                 onClick={handleDisconnectWallet}
@@ -1144,6 +1375,31 @@ function App() {
               >
                 🔒 Disconnect Current Executive Signer
               </button>
+            )}
+
+            {!devMode && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#34d399', marginBottom: '0.5rem' }}>💧 Need GEN tokens for testing?</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Get free testnet GEN tokens to interact with GenLayer StudioNet contracts.</div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <a
+                    href={GEN_FAUCET_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
+                  >
+                    Studio Faucet ↗
+                  </a>
+                  <a
+                    href={GEN_TESTNET_FAUCET_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
+                  >
+                    Testnet Faucet ↗
+                  </a>
+                </div>
+              </div>
             )}
           </div>
         </div>
