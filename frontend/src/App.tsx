@@ -7,7 +7,6 @@ import { formatGen } from './utils'
 
 // Configuration for GenLayer Studio Network (studionet)
 const DEFAULT_CONTRACT_ADDRESS = '0x839828eC875dC7c1EDFEb1CF5b595bBCae4911dD'
-
 const GEN_FAUCET_URL = 'https://studio.genlayer.com'
 const GEN_TESTNET_FAUCET_URL = 'https://testnet-faucet.genlayer.foundation/'
 
@@ -125,7 +124,6 @@ function App() {
   const [walletType, setWalletType] = useState('')
   const [walletBalance, setWalletBalance] = useState('')
 
-
   // Form State for Escrow Creation
   const [escrowId, setEscrowId] = useState('NYC-TRIBECA-88')
   const [landlord, setLandlord] = useState('0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7')
@@ -163,8 +161,6 @@ function App() {
     }
     checkConnection()
   }, [])
-
-
 
   // Fetch real wallet balance via eth_getBalance
   const fetchBalance = async (address: string) => {
@@ -340,7 +336,6 @@ function App() {
     setLoading('creating')
     addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
 
-
     // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
@@ -449,7 +444,6 @@ function App() {
 
     setLoading(`submitting-${role}`)
     addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
-
 
     // --- REAL ON-CHAIN PATH ---
     try {
@@ -563,7 +557,6 @@ function App() {
 
     setLoading('resolving')
     addLog(`Invoking GenLayer consensus resolution: resolve_dispute('${currentEscrow.escrowId}')`)
-
 
     // --- REAL ON-CHAIN PATH ---
     try {
@@ -681,8 +674,6 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-
-
             {/* Connect Web3 Wallet Button */}
             {!walletConnected ? (
               <button 
@@ -1206,8 +1197,6 @@ function App() {
               <span style={{ color: '#34d399', fontWeight: '700', fontSize: '0.85rem' }}>CONNECT REAL WALLET ⚡</span>
             </div>
 
-
-
             {walletConnected && (
               <button 
                 onClick={handleDisconnectWallet}
@@ -1217,30 +1206,28 @@ function App() {
               </button>
             )}
 
-            {(
-              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#34d399', marginBottom: '0.5rem' }}>💧 Need GEN tokens for testing?</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Get free testnet GEN tokens to interact with GenLayer StudioNet contracts.</div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <a
-                    href={GEN_FAUCET_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
-                  >
-                    Studio Faucet ↗
-                  </a>
-                  <a
-                    href={GEN_TESTNET_FAUCET_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
-                  >
-                    Testnet Faucet ↗
-                  </a>
-                </div>
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#34d399', marginBottom: '0.5rem' }}>💧 Need GEN tokens for testing?</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Get free testnet GEN tokens to interact with GenLayer StudioNet contracts.</div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <a
+                  href={GEN_FAUCET_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
+                >
+                  Studio Faucet ↗
+                </a>
+                <a
+                  href={GEN_TESTNET_FAUCET_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ flex: 1, padding: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#34d399', fontSize: '0.78rem', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}
+                >
+                  Testnet Faucet ↗
+                </a>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
