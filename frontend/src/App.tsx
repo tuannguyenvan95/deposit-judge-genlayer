@@ -45,10 +45,10 @@ function App() {
   const [walletBalance, setWalletBalance] = useState('')
 
   // Form State for Escrow Creation
-  const [escrowId, setEscrowId] = useState('NYC-TRIBECA-88')
-  const [landlord, setLandlord] = useState('0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7')
+  const [escrowId, setEscrowId] = useState('')
+  const [landlord, setLandlord] = useState('')
   const [tenant, setTenant] = useState('')
-  const [amount, setAmount] = useState('3500')
+  const [amount, setAmount] = useState('')
 
   // Form State for Evidence Submission
   const [role, setRole] = useState<'tenant' | 'landlord'>('tenant')
