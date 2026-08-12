@@ -71,6 +71,7 @@ function App() {
             setWalletConnected(true)
             setWalletType('MetaMask (Injected)')
             setWalletAddress(accounts[0])
+            setTenant(accounts[0])
             fetchBalance(accounts[0])
           }
         } catch (err) {
