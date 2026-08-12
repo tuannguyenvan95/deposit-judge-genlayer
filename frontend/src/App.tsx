@@ -32,86 +32,6 @@ interface EscrowState {
   tenantPayout: string;
 }
 
-interface LuxuryProperty {
-  id: string;
-  title: string;
-  location: string;
-  price: string;
-  deposit: string;
-  image: string;
-  specs: string;
-  listingUrl: string;
-  landlordAddress: string;
-}
-
-const FEATURED_PROPERTIES: LuxuryProperty[] = [
-  {
-    id: 'DUBAI-ROYAL-01',
-    title: 'The Royal Burj Dubai Penthouse',
-    location: 'Downtown Dubai, UAE',
-    price: '5.00 GEN / month',
-    deposit: '5',
-    image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
-    specs: '6 Bed • 8,500 sq ft • Private Helipad',
-    listingUrl: 'https://www.airbnb.com/rooms/dubai-burj-royal-suite-2026',
-    landlordAddress: '0x71C8A4E2909743e2Ab9f34b7F6B169de00000001'
-  },
-  {
-    id: 'NYC-TRIBECA-88',
-    title: 'Tribeca Skyview Manhattan Loft',
-    location: 'New York City, USA',
-    price: '3.50 GEN / month',
-    deposit: '3.5',
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
-    specs: '3 Bed • 4,200 sq ft • Skyline Terrace',
-    listingUrl: 'https://www.airbnb.com/rooms/ny-luxury-tribeca-loft-4291',
-    landlordAddress: '0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7'
-  },
-  {
-    id: 'PARIS-ELYSEES-07',
-    title: 'Château de Champs-Élysées Villa',
-    location: 'Paris, France',
-    price: '4.20 GEN / month',
-    deposit: '4.2',
-    image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
-    specs: '5 Bed • 6,100 sq ft • Historic Courtyard',
-    listingUrl: 'https://www.airbnb.com/rooms/paris-elysees-villa-heritage-8820',
-    landlordAddress: '0x2F4E9a3b8D1c7B2a0E4d8e6F1A9b3C5d7e0B1C4E'
-  },
-  {
-    id: 'LA-BEVERLY-99',
-    title: 'Beverly Hills Glass Horizon Estate',
-    location: 'Los Angeles, USA',
-    price: '6.00 GEN / month',
-    deposit: '6',
-    image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
-    specs: '7 Bed • 11,000 sq ft • Infinity Pool & Vault',
-    listingUrl: 'https://www.airbnb.com/rooms/la-beverly-hills-infinity-estate-9931',
-    landlordAddress: '0x4D2A9e8B1C7f3E0A5b6C9D1a2F4e7A8B0c3E6D9F'
-  },
-  {
-    id: 'SG-MARINABAY-12',
-    title: 'Singapore Marina Bay Sky Residence',
-    location: 'Marina Bay, Singapore',
-    price: '4.80 GEN / month',
-    deposit: '4.8',
-    image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=80',
-    specs: '4 Bed • 5,200 sq ft • Infinity Pool',
-    listingUrl: 'https://www.airbnb.com/rooms/singapore-marina-bay-sky-12',
-    landlordAddress: '0x9E3F1c4B5A6d7B8c9F0D1E2A3B4C5D6E7F8a9B0C'
-  },
-  {
-    id: 'TYO-ROPPONGI-05',
-    title: 'Tokyo Roppongi Hills Penthouse',
-    location: 'Roppongi, Tokyo, Japan',
-    price: '3.90 GEN / month',
-    deposit: '3.9',
-    image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80',
-    specs: '3 Bed • 3,800 sq ft • Private Onsen & City View',
-    listingUrl: 'https://www.airbnb.com/rooms/tokyo-roppongi-hills-penthouse',
-    landlordAddress: '0x5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D'
-  }
-]
 
 function App() {
   const [activeTab, setActiveTab] = useState<'create' | 'evidence' | 'judge' | 'profile'>('create')
@@ -252,20 +172,6 @@ function App() {
     setWalletBalance('')
   }
 
-  // Lease Featured Property Handler
-  const handleLeaseProperty = (property: LuxuryProperty) => {
-    setEscrowId(property.id)
-    setLandlord(property.landlordAddress)
-    setAmount(property.deposit)
-    if (walletConnected && walletAddress) {
-      setTenant(walletAddress)
-    } else {
-      setTenant('')
-    }
-    setActiveTab('create')
-    addLog(`[Lease Selected] Loaded luxury specifications for: ${property.title} (${property.location})`)
-    window.scrollTo({ top: document.getElementById('console-section')?.offsetTop || 500, behavior: 'smooth' })
-  }
 
 
   // GenLayer live client connection
@@ -280,34 +186,7 @@ function App() {
     return client
   }
 
-  // Demo Data Auto-Fill Helpers for Judges & Quick Walkthroughs
-  const fillDemoCreateEscrow = () => {
-    const demos = [
-      { id: 'LA-BEVERLY-99', amt: '6' },
-      { id: 'NY-MANHATTAN-PH4', amt: '10' },
-      { id: 'MIA-SOUTH-BEACH-12', amt: '8' },
-      { id: 'ASPEN-CHALET-07', amt: '15' },
-      { id: 'SF-PACIFIC-HGHTS-3', amt: '5' }
-    ];
-    const picked = demos[Math.floor(Math.random() * demos.length)];
-    setEscrowId(picked.id);
-    setAmount(picked.amt);
-    addLog(`[Demo] Auto-filled luxury property lease configuration: ${picked.id} (${picked.amt} GEN)`);
-  };
 
-  const fillDemoEvidence = () => {
-    if (role === 'tenant') {
-      setListingUrl('https://deposit-judge-genlayer.vercel.app/demo-listing.txt');
-      setDescription('All rooms left immaculate, kitchen surfaces cleaned, luxury appliances undamaged, and entrance keys returned promptly to the digital lockbox. No damage occurred during tenancy.');
-      setEvidenceUrl('https://deposit-judge-genlayer.vercel.app/demo-tenant-evidence.txt');
-      addLog('[Demo] Auto-filled Tenant defense walkthrough and IPFS visual verification.');
-    } else {
-      setListingUrl('https://deposit-judge-genlayer.vercel.app/demo-listing.txt');
-      setDescription('Imported Italian leather sofa shows extensive gouges and cuts from unauthorized pet claws in violation of No-Pets policy. Master suite marble countertop etched by chemical spillage.');
-      setEvidenceUrl('https://deposit-judge-genlayer.vercel.app/demo-landlord-damage.txt');
-      addLog('[Demo] Auto-filled Landlord check-out damage claim and visual proof.');
-    }
-  };
 
   // 1. Create & Register Escrow
   const handleCreateEscrow = async (e: React.FormEvent) => {
@@ -746,37 +625,7 @@ function App() {
 
       {/* Featured Luxury Real Estate Portfolio */}
       <div className="showcase-section">
-        <div className="showcase-header">
-          <div>
-            <h2 className="showcase-title">Featured Global Real Estate Leases</h2>
-            <p className="showcase-subtitle">Select a verified luxury property to initialize an autonomous intelligent escrow fund.</p>
-          </div>
-        </div>
 
-        <div className="properties-grid">
-          {FEATURED_PROPERTIES.map(item => (
-            <div key={item.id} className="property-card">
-              <div className="property-image-container">
-                <img src={item.image} alt={item.title} className="property-image" />
-                <div className="property-badge">Verified Luxury</div>
-                <div className="property-price">{item.price}</div>
-              </div>
-              <div className="property-body">
-                <div>
-                  <h3 className="property-title">{item.title}</h3>
-                  <div className="property-location">📍 {item.location}</div>
-                  <div className="property-specs">{item.specs}</div>
-                </div>
-                <button 
-                  className="btn-lease"
-                  onClick={() => handleLeaseProperty(item)}
-                >
-                  ✨ Lease & Lock Escrow
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Executive Console Navigation Tabs */}
@@ -815,9 +664,7 @@ function App() {
             <div>
               <div className="panel-header">
                 <h2 className="panel-title"><span>📝</span> Register New Lease Escrow</h2>
-                <button type="button" onClick={fillDemoCreateEscrow} className="btn-demo">
-                  ⚡ Auto-fill Demo Data
-                </button>
+
               </div>
               <div className="panel-body">
                 <form onSubmit={handleCreateEscrow}>
@@ -877,9 +724,7 @@ function App() {
             <div>
               <div className="panel-header">
                 <h2 className="panel-title"><span>📁</span> Check-out Evidence Protocol</h2>
-                <button type="button" onClick={fillDemoEvidence} className="btn-demo">
-                  ⚡ Auto-fill Demo Data
-                </button>
+
               </div>
               <div className="panel-body">
                 <form onSubmit={handleSubmitEvidence}>
