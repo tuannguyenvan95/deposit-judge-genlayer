@@ -55,7 +55,6 @@ function App() {
   const [listingUrl, setListingUrl] = useState('')
   const [description, setDescription] = useState('')
   const [evidenceUrl, setEvidenceUrl] = useState('')
-  const [uploadingIpfs, setUploadingIpfs] = useState(false)
 
   // Current Escrow Interactive Tracker
   const [currentEscrow, setCurrentEscrow] = useState<EscrowState | null>(null)
@@ -399,29 +398,6 @@ function App() {
       setLoading(null)
     }
   }
-
-  // 2.5 Handle Real File Evidence Load
-  const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
-    setUploadingIpfs(true)
-    addLog(`[Evidence Loader] Reading local evidence file ${file.name}...`)
-    
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (reader.result) {
-        setEvidenceUrl(reader.result.toString());
-        setUploadingIpfs(false);
-        addLog(`[Evidence Loader] File successfully processed and prepared for immutable submission.`);
-      }
-    };
-    reader.onerror = () => {
-      alert('Failed to read evidence file.');
-      setUploadingIpfs(false);
-    };
-    reader.readAsDataURL(file);
-  }
-
   // 3. Trigger AI Consensus Resolution (Real On-Chain Only)
   const handleResolveDispute = async () => {
     if (!walletConnected || !walletAddress) {
@@ -763,40 +739,15 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="evidence-upload">Photo & Video Evidence Repository (IPFS Upload)</label>
-                    <div className="ipfs-upload-box">
-                      {uploadingIpfs ? (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--gold-light)' }}>
-                          ⏳ Encrypting & Pinning to IPFS...
-                        </div>
-                      ) : evidenceUrl && evidenceUrl.startsWith('ipfs://') ? (
-                        <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#34d399', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>✅ Pinned: {evidenceUrl.slice(0, 18)}...</span>
-                          <button type="button" onClick={() => setEvidenceUrl('')} style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer' }}>✕</button>
-                        </div>
-                      ) : (
-                        <div style={{ position: 'relative', padding: '1.25rem', textAlign: 'center', border: '1px dashed var(--border-gold)', borderRadius: '8px', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', transition: 'all 0.3s' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>📸 Click to select & pin visual evidence to IPFS</span>
-                          <input 
-                            id="evidence-upload"
-                            type="file" 
-                            accept="image/*,video/*"
-                            onChange={handleUploadFile}
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    {(!evidenceUrl || !evidenceUrl.startsWith('ipfs://')) && (
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        style={{ marginTop: '0.75rem', opacity: 0.6 }}
-                        value={evidenceUrl} 
-                        onChange={e => setEvidenceUrl(e.target.value)}
-                        placeholder="...or paste external URL (e.g. https://imgur.com/a/...)" 
-                      />
-                    )}
+                    <label htmlFor="evidence-url">Photo & Video Evidence Repository URL</label>
+                    <input 
+                      id="evidence-url"
+                      type="text" 
+                      className="form-input" 
+                      value={evidenceUrl} 
+                      onChange={e => setEvidenceUrl(e.target.value)}
+                      placeholder="Paste external URL (e.g. https://imgur.com/a/...)" 
+                    />
                   </div>
                   <button type="submit" className="btn-primary" disabled={loading?.startsWith('submitting')}>
                     {loading?.startsWith('submitting') ? '⏳ Cryptographically Sealing Evidence...' : `🔒 Submit & Seal ${role.toUpperCase()} Record`}
