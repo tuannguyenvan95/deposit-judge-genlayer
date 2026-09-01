@@ -548,27 +548,6 @@ body {
   transform: translateY(-2px);
 }
 
-.btn-demo {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  color: var(--gold-light, #f4e095);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  letter-spacing: 0.5px;
-}
-.btn-demo:hover {
-  background: var(--gold-gradient);
-  color: #0b0f17;
-  border-color: transparent;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
-  transform: translateY(-1px);
-}
 
 /* AI Judge Tribunal Execution Panel */
 .tribunal-panel {

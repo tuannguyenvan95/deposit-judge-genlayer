@@ -26,3 +26,5 @@ dist-ssr
 .vercel
 \n# Playwright test results\ntest-results/
 e2e/screenshots/
+
+.env*
