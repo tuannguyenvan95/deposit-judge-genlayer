@@ -209,7 +209,8 @@ function App() {
       addLog(`Waiting for GenLayer validators to finalize transaction...`)
       const receipt = await client.waitForTransactionReceipt({
         hash: txHash,
-        status: TransactionStatus.FINALIZED,
+        status: TransactionStatus.ACCEPTED,
+        retries: 45,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
       if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
@@ -293,7 +294,8 @@ function App() {
       addLog(`Waiting for GenLayer validators to finalize...`)
       const receipt = await client.waitForTransactionReceipt({
         hash: txHash,
-        status: TransactionStatus.FINALIZED,
+        status: TransactionStatus.ACCEPTED,
+        retries: 45,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
       if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
@@ -368,7 +370,8 @@ function App() {
       addLog(`Waiting for AI consensus finalization (this may take 30-120s)...`)
       const receipt = await client.waitForTransactionReceipt({
         hash: txHash,
-        status: TransactionStatus.FINALIZED,
+        status: TransactionStatus.ACCEPTED,
+        retries: 45,
       })
       addLog(`AI consensus finalized. Status: ${receipt.statusName || receipt.status}`)
       if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
