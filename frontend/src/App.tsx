@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from 'genlayer-js'
 import { studionet } from 'genlayer-js/chains'
+import { TransactionStatus } from 'genlayer-js/types'
 import { getAddress } from 'viem'
 import './index.css'
 import { formatGen } from './utils'
@@ -112,36 +113,10 @@ function App() {
     setLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 15)])
   }
 
-  // --- PATCH FOR GENLAYER GAS PRICE BUG ---
-  // The genlayer-js SDK fetches eth_gasPrice directly from the RPC node.
-  // Since GenLayer Studionet returns 0x0, the SDK passes gasPrice: 0 to MetaMask,
-  // which causes the "feeCap 0 below chain minimum" error.
-  // We intercept the fetch call to override the gas price to 5 Gwei (GenLayer Studionet returns 0x0 which causes MetaMask to reject).
-  useEffect(() => {
-    if (!(window as any)._patchedFetch) {
-      const originalFetch = window.fetch;
-      window.fetch = async (...args) => {
-        const url = args[0] as string;
-        if (url && typeof url === 'string' && url.includes('studio.genlayer.com/rpc')) {
-          const init = args[1] as RequestInit;
-          if (init && init.body && typeof init.body === 'string' && init.body.includes('"eth_gasPrice"')) {
-            return new Response(JSON.stringify({
-              jsonrpc: "2.0",
-              id: JSON.parse(init.body).id || 1,
-              result: "0x12a05f200" // 5 Gwei
-            }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          }
-        }
-        return originalFetch(...args);
-      };
-      (window as any)._patchedFetch = true;
-    }
-  }, [])
 
-  // Web3 Wallet Connector Handlers - 100% Real On-Chain Execution Only
+
+
+  // Wallet connection handlers
   const handleConnectWallet = async (type: string) => {
     try {
       if (typeof window !== 'undefined' && (window as any).ethereum) {
@@ -154,7 +129,7 @@ function App() {
         setTenant(address)
         fetchBalance(address)
         setShowWalletModal(false)
-        addLog(`[Web3 Auth] Connected real on-chain signer: ${address} via ${type}`)
+        addLog(`Wallet connected: ${address} via ${type}`)
       } else {
         alert("Web3 Provider not found! Please install MetaMask or a compatible Ethereum wallet extension to interact with GenLayer StudioNet directly.");
       }
@@ -164,35 +139,29 @@ function App() {
   }
 
   const handleDisconnectWallet = () => {
-    addLog(`[Web3 Auth] Disconnected executive signer ${walletAddress} (${walletType})`)
+    addLog(`Wallet disconnected.`)
     setWalletConnected(false)
     setWalletAddress('')
     setTenant('')
     setWalletType('')
     setWalletBalance('')
   }
-
-
-
-  // GenLayer live client connection
+  // GenLayer client
   const getClient = () => {
     const config: any = { chain: studionet }
     if (typeof window !== 'undefined' && (window as any).ethereum && walletConnected && walletAddress) {
       config.provider = (window as any).ethereum
       config.account = walletAddress
     }
-    const client = createClient(config)
-    console.log('GenLayer client initialized for network:', client.chain?.name)
-    return client
+    return createClient(config)
   }
-
 
 
   // 1. Create & Register Escrow
   const handleCreateEscrow = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!walletConnected || !walletAddress) {
-      alert('Please connect your real Web3 wallet (MetaMask) first to perform on-chain transactions on GenLayer StudioNet!');
+      alert('Please connect your Web3 wallet (MetaMask) first.')
       return
     }
     if (!escrowId || !landlord || !tenant || !amount) {
@@ -205,17 +174,15 @@ function App() {
       return
     }
     if (!landlord.match(/^0x[a-fA-F0-9]{40}$/)) {
-      alert('Landlord address must be a valid 42-character Web3 hex address (e.g., 0x123...abc). Remove any extra text or names.')
+      alert('Landlord address must be a valid 42-character hex address.')
       return
     }
     if (!tenant.match(/^0x[a-fA-F0-9]{40}$/)) {
-      alert('Tenant address must be a valid 42-character Web3 hex address (e.g., 0x123...abc). Remove any extra text or names.')
+      alert('Tenant address must be a valid 42-character hex address.')
       return
     }
     setLoading('creating')
-    addLog(`Initiating GenLayer transaction to register escrow ID: ${escrowId}...`)
 
-    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
       
@@ -226,80 +193,63 @@ function App() {
         return BigInt(whole + fraction)
       })()
 
-      // 1. Create and Fund Escrow (Atomic Transaction)
-      addLog(`[Tx] Deploying and Funding Vault with ${amount} GEN...`)
       const uniqueEscrowId = `${escrowId}-${Math.floor(Math.random() * 1000000)}`
-      try {
-        await client.writeContract({
-          address: contractAddress as `0x${string}`,
-          functionName: 'create_escrow',
-          args: [uniqueEscrowId, getAddress(landlord), getAddress(tenant)],
-          value: amountInWei,
-          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
-        })
-      } catch (wErr: any) {
-        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
-          addLog(`[Network Note] StudioNet RPC socket timed out during tx dispatch; proceeding to poll on-chain validators...`);
-        } else {
-          throw wErr;
-        }
-      }
-      await new Promise(r => setTimeout(r, 3000)); // allow validators time to index state
 
-      // 2. Read back on-chain state to confirm (with polling)
-      addLog(`[On-Chain] Verifying escrow state from contract (waiting for nodes)...`)
-      let onChainData: any = null;
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-          const escrowDataRaw = await client.readContract({
-            address: contractAddress as `0x${string}`,
-            functionName: 'get_escrow',
-            args: [uniqueEscrowId]
-          });
-          const parsed = JSON.parse(escrowDataRaw as string);
-          if (parsed && parsed.tenant_funded) {
-            onChainData = parsed;
-            addLog(`[Success] Verified on-chain data for ${uniqueEscrowId}`);
-            break;
-          }
-        } catch (e: any) {
-          addLog(`[Polling] Attempt ${attempt}/5: Failed to read state - ${e.message}`);
-        }
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      // Step 1: Send signed transaction to GenLayer
+      addLog(`Sending create_escrow transaction for ${uniqueEscrowId}...`)
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'create_escrow',
+        args: [uniqueEscrowId, getAddress(landlord), getAddress(tenant)],
+        value: amountInWei,
+      })
+      addLog(`Transaction submitted: ${txHash}`)
 
-      if (!onChainData) {
-        throw new Error("Escrow registration failed to index on-chain within waiting period or transaction errored on GenVM.");
-      }
+      // Step 2: Wait for GenLayer consensus to finalize the transaction
+      addLog(`Waiting for GenLayer validators to finalize transaction...`)
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.FINALIZED,
+      })
+      addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
+
+      // Step 3: Read confirmed on-chain state
+      addLog(`Reading escrow state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [uniqueEscrowId]
+      })
+      const onChainData = JSON.parse(escrowDataRaw as string)
 
       const newEscrow: EscrowState = {
         escrowId: uniqueEscrowId,
         landlord: onChainData.landlord || landlord,
         tenant: onChainData.tenant || tenant,
         depositAmount: amount,
-        landlordFunded: onChainData.landlord_funded ?? true,
-        tenantFunded: onChainData.tenant_funded ?? true,
-        tenantSubmitted: onChainData.tenant_evidence_submitted ?? false,
+        landlordFunded: onChainData.landlord_funded,
+        tenantFunded: onChainData.tenant_funded,
+        tenantSubmitted: onChainData.tenant_evidence_submitted,
         tenantListingUrl: onChainData.tenant_listing_url || '',
         tenantDescription: onChainData.tenant_description || '',
         tenantEvidenceUrl: onChainData.tenant_evidence_url || '',
-        landlordSubmitted: onChainData.landlord_evidence_submitted ?? false,
+        landlordSubmitted: onChainData.landlord_evidence_submitted,
         landlordListingUrl: onChainData.landlord_listing_url || '',
         landlordDescription: onChainData.landlord_description || '',
         landlordEvidenceUrl: onChainData.landlord_evidence_url || '',
-        resolved: onChainData.resolved ?? false,
+        resolved: onChainData.resolved,
         verdict: onChainData.verdict || 'PENDING',
-        reason: onChainData.reason || 'Awaiting evidence submission and AI Tribunal consensus.',
+        reason: onChainData.reason || 'Awaiting evidence submission.',
         landlordPayout: formatGen(onChainData.landlord_payout || '0'),
         tenantPayout: formatGen(onChainData.tenant_payout || '0')
       }
 
       setCurrentEscrow(newEscrow)
-      addLog(`[Success] Escrow registered and funded on-chain! Deposit locked: ${amount} GEN. Tenant funded: ${newEscrow.tenantFunded}`)
+      addLog(`Escrow ${uniqueEscrowId} created and funded with ${amount} GEN.`)
       setActiveTab('evidence')
     } catch (err) {
       console.error(err)
-      addLog(`[Error] Failed to initialize escrow on Studionet: ${String(err)}`)
+      addLog(`[Error] ${String(err)}`)
     } finally {
       setLoading(null)
     }
@@ -322,153 +272,111 @@ function App() {
     }
 
     setLoading(`submitting-${role}`)
-    addLog(`Sending ${role.toUpperCase()} check-out evidence bundle to contract ${contractAddress}...`)
 
-    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
-      try {
-        await client.writeContract({
-          address: contractAddress as `0x${string}`,
-          functionName: 'submit_evidence',
-          args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
-          value: 0n,
-          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
-        })
-      } catch (wErr: any) {
-        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
-          addLog(`[Network Note] StudioNet RPC socket timed out during evidence transmission; verifying on-chain storage...`);
-        } else {
-          throw wErr;
-        }
-      }
-      await new Promise(r => setTimeout(r, 3000)); // allow validators time to index state
-      
-      // Read back on-chain state to confirm evidence was stored (with polling)
-      addLog(`[On-Chain] Verifying evidence state for ${currentEscrow.escrowId}...`)
-      
-      let onChainData: any = null;
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-          const escrowDataRaw = await client.readContract({
-            address: contractAddress as `0x${string}`,
-            functionName: 'get_escrow',
-            args: [currentEscrow.escrowId]
-          });
-          const parsed = JSON.parse(escrowDataRaw as string);
-          
-          // Verify that the evidence was actually stored in the returned state
-          if ((role === 'tenant' && parsed.tenant_evidence_submitted) || 
-              (role === 'landlord' && parsed.landlord_evidence_submitted)) {
-            onChainData = parsed;
-            addLog(`[Success] Verified on-chain evidence for ${role}`);
-            break;
-          }
-          throw new Error("State fetched but evidence field is still false.");
-        } catch (e: any) {
-          addLog(`[Polling] Attempt ${attempt}/5: ${e.message}`);
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
 
-      if (!onChainData) {
-        throw new Error("Evidence submission failed to verify on-chain within waiting period or transaction errored on GenVM.");
-      }
+      // Step 1: Send signed transaction
+      addLog(`Sending submit_evidence transaction (${role})...`)
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'submit_evidence',
+        args: [currentEscrow.escrowId, role, listingUrl, description, evidenceUrl],
+        value: 0n,
+      })
+      addLog(`Transaction submitted: ${txHash}`)
+
+      // Step 2: Wait for finalization
+      addLog(`Waiting for GenLayer validators to finalize...`)
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.FINALIZED,
+      })
+      addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
+
+      // Step 3: Read confirmed state
+      addLog(`Reading evidence state from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [currentEscrow.escrowId]
+      })
+      const onChainData = JSON.parse(escrowDataRaw as string)
 
       const updated: EscrowState = {
         ...currentEscrow,
-        tenantSubmitted: onChainData.tenant_evidence_submitted ?? currentEscrow.tenantSubmitted,
+        tenantSubmitted: onChainData.tenant_evidence_submitted,
         tenantListingUrl: onChainData.tenant_listing_url || currentEscrow.tenantListingUrl,
         tenantDescription: onChainData.tenant_description || currentEscrow.tenantDescription,
         tenantEvidenceUrl: onChainData.tenant_evidence_url || currentEscrow.tenantEvidenceUrl,
-        landlordSubmitted: onChainData.landlord_evidence_submitted ?? currentEscrow.landlordSubmitted,
+        landlordSubmitted: onChainData.landlord_evidence_submitted,
         landlordListingUrl: onChainData.landlord_listing_url || currentEscrow.landlordListingUrl,
         landlordDescription: onChainData.landlord_description || currentEscrow.landlordDescription,
         landlordEvidenceUrl: onChainData.landlord_evidence_url || currentEscrow.landlordEvidenceUrl,
       }
 
       setCurrentEscrow(updated)
-      addLog(`[Confirmed] ${role.toUpperCase()} evidence immutably sealed on GenLayer studionet.`)
+      addLog(`${role.toUpperCase()} evidence sealed on-chain.`)
       
       if (updated.tenantSubmitted || updated.landlordSubmitted) {
         setActiveTab('judge')
       }
     } catch (err) {
-      addLog(`[Error] Failed to append evidence: ${String(err)}`)
+      addLog(`[Error] ${String(err)}`)
     } finally {
       setLoading(null)
     }
   }
-  // 3. Trigger AI Consensus Resolution (Real On-Chain Only)
+
+  // 3. Trigger AI Consensus Resolution
   const handleResolveDispute = async () => {
     if (!walletConnected || !walletAddress) {
-      alert('Please connect your real Web3 wallet (MetaMask) first to perform on-chain transactions on GenLayer StudioNet!');
+      alert('Please connect your Web3 wallet (MetaMask) first.')
       return
     }
     if (!currentEscrow) return
     if (!currentEscrow.tenantSubmitted && !currentEscrow.landlordSubmitted) {
-      alert('Please submit at least one check-out evidence record before convening the AI Tribunal.')
+      alert('Please submit at least one evidence record before resolving.')
       return
     }
 
     setLoading('resolving')
-    addLog(`Invoking GenLayer consensus resolution: resolve_dispute('${currentEscrow.escrowId}')`)
 
-    // --- REAL ON-CHAIN PATH ---
     try {
       const client = getClient()
-      try {
-        await client.writeContract({
-          address: contractAddress as `0x${string}`,
-          functionName: 'resolve_dispute',
-          args: [currentEscrow.escrowId],
-          value: 0n,
-          account: (client.account || { address: walletAddress as `0x${string}`, type: "json-rpc" }) as any
-        })
-      } catch (wErr: any) {
-        if (String(wErr).includes('Failed to fetch') || String(wErr).includes('UnknownRpcError') || String(wErr).includes('timeout')) {
-          addLog(`[AI Tribunal Note] StudioNet HTTP timeout reached while validators execute web renders & LLM. Proceeding to poll consensus state...`);
-        } else {
-          throw wErr;
-        }
-      }
-      
-      setAiStage('Waiting for validators to execute LLM prompt and reach consensus...')
-      await new Promise(r => setTimeout(r, 4000)); // allow validators time to index consensus state
-      
-      // Read actual on-chain result from the contract (with polling)
-      addLog(`[On-Chain] Reading escrow state from contract (waiting for consensus)...`)
-      
-      let onChainData: any = null;
-      const totalAttempts = 25; // StudioNet web.render + LLM consensus typically takes ~30-50s
-      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-        try {
-          setAiStage(`Validator nodes executing AI prompt & consensus (Attempt ${attempt}/${totalAttempts})...`);
-          const escrowDataRaw = await client.readContract({
-            address: contractAddress as `0x${string}`,
-            functionName: 'get_escrow',
-            args: [currentEscrow.escrowId]
-          });
-          const parsed = JSON.parse(escrowDataRaw as string);
-          
-          if (parsed && parsed.resolved) {
-            onChainData = parsed;
-            addLog(`[Success] Verified AI consensus on-chain after ${attempt} attempts!`);
-            break;
-          }
-          throw new Error("Escrow not yet resolved");
-        } catch {
-          addLog(`[Polling] Attempt ${attempt}/${totalAttempts}: AI consensus executing on validators...`);
-          await new Promise(r => setTimeout(r, 4000));
-        }
-      }
 
-      if (!onChainData) {
-        throw new Error("Consensus resolution did not finalize on-chain. Transaction may have errored or was rejected by GenVM validators.");
-      }
+      // Step 1: Send resolve_dispute transaction
+      addLog(`Sending resolve_dispute transaction for ${currentEscrow.escrowId}...`)
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'resolve_dispute',
+        args: [currentEscrow.escrowId],
+        value: 0n,
+      })
+      addLog(`Transaction submitted: ${txHash}`)
+
+      // Step 2: Wait for GenLayer AI consensus to finalize
+      // This transaction involves nondet.web.render + nondet.exec_prompt,
+      // so validators need extra time to reach consensus.
+      setAiStage('Waiting for GenLayer AI consensus...')
+      addLog(`Waiting for AI consensus finalization (this may take 30-120s)...`)
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.FINALIZED,
+      })
+      addLog(`AI consensus finalized. Status: ${receipt.statusName || receipt.status}`)
+
+      // Step 3: Read the verdict from contract state
+      addLog(`Reading verdict from contract...`)
+      const escrowDataRaw = await client.readContract({
+        address: contractAddress as `0x${string}`,
+        functionName: 'get_escrow',
+        args: [currentEscrow.escrowId]
+      })
+      const onChainData = JSON.parse(escrowDataRaw as string)
 
       const verdict = onChainData.verdict || 'NORMAL_WEAR'
-      const reason = onChainData.reason || 'No reasoning returned from AI consensus.'
+      const reason = onChainData.reason || 'No reasoning returned.'
       const landlordPayout = formatGen(onChainData.landlord_payout || '0')
       const tenantPayout = formatGen(onChainData.tenant_payout || currentEscrow.depositAmount)
 
@@ -484,9 +392,9 @@ function App() {
       setCurrentEscrow(resolvedEscrow)
       setAiStage('')
       setLoading(null)
-      addLog(`[Consensus Finalized] Verdict: ${verdict}. Landlord: ${landlordPayout} GEN | Tenant: ${tenantPayout} GEN.`)
+      addLog(`Verdict: ${verdict}. Landlord: ${landlordPayout} GEN | Tenant: ${tenantPayout} GEN.`)
     } catch (err) {
-      addLog(`[Error] Failed to resolve dispute on Studionet: ${String(err)}`)
+      addLog(`[Error] ${String(err)}`)
       setAiStage('')
       setLoading(null)
     }
