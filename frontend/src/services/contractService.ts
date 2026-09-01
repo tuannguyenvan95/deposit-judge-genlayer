@@ -1,4 +1,4 @@
-import { createClient, custom } from 'genlayer-js';
+import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x6068Fa240E703B394e2DA037F863Aa1E7935Ce15";
@@ -77,8 +77,9 @@ export const executeContractWrite = async (
   }
 
   const receipt = await client.waitForTransactionReceipt({ hash, retries: 45 });
-  if (!receipt) {
-    throw new Error(`Transaction failed or reverted on-chain (Status: ${receipt?.statusName || receipt?.status || 'UNKNOWN'})`);
+  const recAny = receipt as any;
+  if (!receipt || (recAny?.txExecutionResult !== undefined && recAny?.txExecutionResult !== 1 && recAny?.txExecutionResult !== 0)) {
+    throw new Error(`Transaction failed or reverted on-chain (Status: ${recAny?.statusName || recAny?.status || 'UNKNOWN'})`);
   }
 
   // Read confirmed on-chain state back
