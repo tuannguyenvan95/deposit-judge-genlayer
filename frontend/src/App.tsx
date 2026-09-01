@@ -7,7 +7,7 @@ import './index.css'
 import { formatGen } from './utils'
 
 // Configuration for GenLayer Studio Network (studionet)
-const DEFAULT_CONTRACT_ADDRESS = '0x6068Fa240E703B394e2DA037F863Aa1E7935Ce15'
+const DEFAULT_CONTRACT_ADDRESS = '0xAf4f941bFCBf2B715dF232dE24E9e222709A142F'
 const GEN_FAUCET_URL = 'https://studio.genlayer.com'
 const GEN_TESTNET_FAUCET_URL = 'https://testnet-faucet.genlayer.foundation/'
 

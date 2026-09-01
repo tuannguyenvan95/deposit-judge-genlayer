@@ -1,7 +1,7 @@
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x6068Fa240E703B394e2DA037F863Aa1E7935Ce15";
+export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0xAf4f941bFCBf2B715dF232dE24E9e222709A142F";
 
 export interface EscrowItem {
   id: string;
