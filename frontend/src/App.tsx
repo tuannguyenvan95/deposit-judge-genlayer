@@ -212,8 +212,8 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
-      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
-        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${(receipt as any).txExecutionResultName || (receipt as any).txExecutionResult})`)
       }
 
       // Step 3: Read confirmed on-chain state
@@ -296,8 +296,8 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
-      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
-        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${(receipt as any).txExecutionResultName || (receipt as any).txExecutionResult})`)
       }
 
       // Step 3: Read confirmed state
@@ -371,8 +371,8 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`AI consensus finalized. Status: ${receipt.statusName || receipt.status}`)
-      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
-        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      if ((receipt as any).txExecutionResult !== undefined && (receipt as any).txExecutionResult !== 1 && (receipt as any).txExecutionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${(receipt as any).txExecutionResultName || (receipt as any).txExecutionResult})`)
       }
 
       // Step 3: Read the verdict from contract state
