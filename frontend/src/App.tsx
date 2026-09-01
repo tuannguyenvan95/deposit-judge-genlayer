@@ -212,6 +212,9 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
+      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      }
 
       // Step 3: Read confirmed on-chain state
       addLog(`Reading escrow state from contract...`)
@@ -293,6 +296,9 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`Transaction finalized. Status: ${receipt.statusName || receipt.status}`)
+      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      }
 
       // Step 3: Read confirmed state
       addLog(`Reading evidence state from contract...`)
@@ -365,6 +371,9 @@ function App() {
         status: TransactionStatus.FINALIZED,
       })
       addLog(`AI consensus finalized. Status: ${receipt.statusName || receipt.status}`)
+      if (receipt.executionResult !== undefined && receipt.executionResult !== 1 && receipt.executionResult !== 0) {
+        throw new Error(`Transaction reverted on-chain by GenVM (Result: ${receipt.executionResultName || receipt.executionResult})`)
+      }
 
       // Step 3: Read the verdict from contract state
       addLog(`Reading verdict from contract...`)

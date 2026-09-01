@@ -46,8 +46,6 @@ class Contract(gl.Contract):
         
         if sender != landlord_addr and sender != tenant_addr:
             raise UserError("Authentication failed: Caller must be either the designated Landlord or Tenant")
-        if landlord_addr == tenant_addr:
-            raise UserError("Landlord and Tenant cannot be the same address")
         
         self.escrows[escrow_id] = Escrow(
             landlord=landlord_addr,
