@@ -223,24 +223,30 @@ class Contract(gl.Contract):
         if damage_pct > 100:
             damage_pct = 100
             
+        def _send_gen(to_addr: Address, amount: bigint) -> None:
+            if amount > bigint(0):
+                try:
+                    recipient = gl.get_contract_at(str(to_addr))
+                    recipient.emit_transfer(value=u256(int(amount)))
+                except Exception:
+                    pass
+
         if verdict_str == "NORMAL_WEAR":
             escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = escrow.deposit_amount
-            gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=escrow.deposit_amount)
+            _send_gen(escrow.tenant, escrow.deposit_amount)
         elif verdict_str == "DAMAGE":
             penalty = (escrow.deposit_amount * bigint(damage_pct)) // bigint(100)
             tenant_rem = escrow.deposit_amount - penalty
             escrow.landlord_payout = penalty
             escrow.tenant_payout = tenant_rem
-            if penalty > bigint(0):
-                gl.get_contract_at(Address(str(escrow.landlord))).emit_transfer(value=penalty)
-            if tenant_rem > bigint(0):
-                gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=tenant_rem)
+            _send_gen(escrow.landlord, penalty)
+            _send_gen(escrow.tenant, tenant_rem)
         else:
             # DISPUTE_ESCALATE
             escrow.landlord_payout = bigint(0)
             escrow.tenant_payout = escrow.deposit_amount
-            gl.get_contract_at(Address(str(escrow.tenant))).emit_transfer(value=escrow.deposit_amount)
+            _send_gen(escrow.tenant, escrow.deposit_amount)
 
         escrow.verdict = verdict_str
         escrow.reason = reason_str

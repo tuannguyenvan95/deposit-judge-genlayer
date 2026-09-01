@@ -193,7 +193,7 @@ function App() {
         return BigInt(whole + fraction)
       })()
 
-      const uniqueEscrowId = `${escrowId}-${Math.floor(Math.random() * 1000000)}`
+      const uniqueEscrowId = escrowId.trim()
 
       // Step 1: Send signed transaction to GenLayer
       addLog(`Sending create_escrow transaction for ${uniqueEscrowId}...`)
